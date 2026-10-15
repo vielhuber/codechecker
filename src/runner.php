@@ -10,6 +10,7 @@ use Symfony\Component\Process\Process;
 final class runner
 {
     private const OUTPUT_LIMIT = 1048576;
+    private const OUTPUT_RETENTION = 86_400;
 
     /**
      * Run argument arrays without a shell and retain failures as report data.
@@ -29,7 +30,21 @@ final class runner
                 errorOutput: 'Executable not found: ' . $tool->executable()
             );
         }
-        $cache = sys_get_temp_dir() . '/codechecker-' . bin2hex(random_bytes(12));
+        $cachePrefix = sys_get_temp_dir() . '/codechecker-' . substr(hash('sha256', $workspace->root), 0, 16) . '-';
+        foreach (glob($cachePrefix . '*/stdout.log') ?: [] as $previousOutput) {
+            $directory = dirname($previousOutput);
+            $modified = filemtime($previousOutput);
+            if (
+                $modified !== false &&
+                $modified < time() - self::OUTPUT_RETENTION &&
+                glob($directory . '/*') === [$directory . '/stderr.log', $directory . '/stdout.log']
+            ) {
+                unlink($directory . '/stderr.log');
+                unlink($previousOutput);
+                rmdir($directory);
+            }
+        }
+        $cache = $cachePrefix . bin2hex(random_bytes(12));
         if (!mkdir($cache, 0700)) {
             return new result(
                 tool: $tool,
@@ -46,7 +61,22 @@ final class runner
         $truncated = false;
         $exitCode = null;
         $status = status::Error;
+        $outputStream = null;
+        $errorStream = null;
+        $outputFile = null;
+        $errorOutputFile = null;
+        $process = null;
         try {
+            $outputStream = fopen($cache . '/stdout.log', 'x+b');
+            $errorStream = fopen($cache . '/stderr.log', 'x+b');
+            if (
+                $outputStream === false ||
+                $errorStream === false ||
+                !chmod($cache . '/stdout.log', 0600) ||
+                !chmod($cache . '/stderr.log', 0600)
+            ) {
+                throw exception::outputStorageFailed();
+            }
             $configurationDirectory = __DIR__ . '/../config';
             $arguments = match ($tool) {
                 tool::PhpSyntax => ['-l'],
@@ -221,8 +251,14 @@ final class runner
                 &$output,
                 &$errorOutput,
                 &$truncated,
+                $outputStream,
+                $errorStream,
                 $process
             ): void {
+                $stream = $type === Process::ERR ? $errorStream : $outputStream;
+                if (fwrite($stream, $chunk) !== strlen($chunk)) {
+                    throw exception::outputStorageFailed();
+                }
                 $buffer = $type === Process::ERR ? $errorOutput : $output;
                 $available = max(0, self::OUTPUT_LIMIT - strlen($buffer));
                 $truncated = $truncated || strlen($chunk) > $available;
@@ -236,6 +272,20 @@ final class runner
                 $process->clearOutput();
                 $process->clearErrorOutput();
             });
+            $output = $this->preview($output);
+            $errorOutput = $this->preview($errorOutput);
+            $diagnostics = null;
+            if (
+                in_array(
+                    $tool,
+                    [tool::PhpStan, tool::PhpCodeSniffer, tool::Biome, tool::MagoLint, tool::MagoAnalyze],
+                    true
+                )
+            ) {
+                $diagnostics = $this->diagnosticObject(
+                    json_decode((string) file_get_contents($cache . '/stdout.log'), true)
+                );
+            }
             $findingCodes = match ($tool) {
                 tool::PhpSyntax => [255],
                 tool::Rector, tool::Psalm => [2],
@@ -250,16 +300,17 @@ final class runner
                     : (in_array($exitCode, $findingCodes, true)
                         ? status::Findings
                         : status::Error);
-            if ($tool === tool::PhpStan && $exitCode !== 0) {
-                $diagnostics = $this->diagnosticObject(json_decode($output, true));
-                if ($diagnostics === null || ($diagnostics['errors'] ?? []) !== []) {
-                    $status = status::Error;
-                }
+            if (
+                $tool === tool::PhpStan &&
+                $exitCode !== 0 &&
+                ($diagnostics === null || ($diagnostics['errors'] ?? []) !== [])
+            ) {
+                $status = status::Error;
             }
             if (
                 in_array($tool, [tool::PhpCodeSniffer, tool::Biome], true) &&
                 $exitCode !== 0 &&
-                $this->diagnosticObject(json_decode($output, true)) === null
+                $diagnostics === null
             ) {
                 $status = status::Error;
             }
@@ -270,27 +321,44 @@ final class runner
             ) {
                 $status = status::Error;
             }
-            if (in_array($tool, [tool::MagoLint, tool::MagoAnalyze], true) && $exitCode === 0) {
-                $diagnostics = $this->diagnosticObject(json_decode($output, true));
-                if ($diagnostics !== null && ($diagnostics['issues'] ?? []) !== []) {
-                    $status = status::Findings;
-                }
-            }
-            if ($truncated) {
-                $status = status::Error;
+            if (
+                in_array($tool, [tool::MagoLint, tool::MagoAnalyze], true) &&
+                $exitCode === 0 &&
+                $diagnostics !== null &&
+                ($diagnostics['issues'] ?? []) !== []
+            ) {
+                $status = status::Findings;
             }
         } catch (ProcessTimedOutException $exception) {
             $status = status::Timeout;
             $errorOutput .= $exception->getMessage();
+        } catch (exception $exception) {
+            $status = status::Error;
+            $output = '';
+            $errorOutput = $exception->getMessage();
+            $process?->stop();
         } catch (ProcessException | \JsonException $exception) {
             $errorOutput .= $exception->getMessage();
         } finally {
+            if (is_resource($outputStream)) {
+                fclose($outputStream);
+            }
+            if (is_resource($errorStream)) {
+                fclose($errorStream);
+            }
+            if ($truncated && is_file($cache . '/stdout.log') && is_file($cache . '/stderr.log')) {
+                $outputFile = $cache . '/stdout.log';
+                $errorOutputFile = $cache . '/stderr.log';
+            }
             $iterator = new \RecursiveIteratorIterator(
                 new \RecursiveDirectoryIterator($cache, \FilesystemIterator::SKIP_DOTS),
                 \RecursiveIteratorIterator::CHILD_FIRST
             );
             foreach ($iterator as $file) {
-                if ($file instanceof \SplFileInfo) {
+                if (
+                    $file instanceof \SplFileInfo &&
+                    !in_array($file->getPathname(), [$outputFile, $errorOutputFile], true)
+                ) {
                     $directory = $file->isDir() && !$file->isLink();
                     if ($directory) {
                         rmdir($file->getPathname());
@@ -300,7 +368,9 @@ final class runner
                     }
                 }
             }
-            rmdir($cache);
+            if ($outputFile === null) {
+                rmdir($cache);
+            }
         }
         return new result(
             tool: $tool,
@@ -312,8 +382,22 @@ final class runner
             output: $output,
             errorOutput: $errorOutput,
             seconds: round(microtime(true) - $started, 3),
-            outputTruncated: $truncated
+            outputTruncated: $truncated,
+            outputFile: $outputFile,
+            errorOutputFile: $errorOutputFile
         );
+    }
+
+    /** Keep a bounded preview on UTF-8 boundaries without altering the retained raw log. */
+    private function preview(string $text): string
+    {
+        for ($trim = 0; $trim < 4; ++$trim) {
+            $preview = $trim === 0 ? $text : substr($text, 0, -$trim);
+            if (preg_match('//u', $preview) === 1) {
+                return $preview;
+            }
+        }
+        throw exception::outputStorageFailed();
     }
 
     /**

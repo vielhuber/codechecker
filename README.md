@@ -66,7 +66,9 @@ echo json_encode($report, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
 exit($report->exitCode());
 ```
 
-omit `tools` to run every applicable check. reports contain `files`, native tool `results`, `complete` and `passed`. unavailable tools, execution errors, timeouts or truncated output make a report incomplete; findings alone do not. each output stream is limited to one MiB per invocation.
+omit `tools` to run every applicable check. reports contain `files`, native tool `results`, `complete` and `passed`. unavailable tools, execution errors, timeouts or failed output capture make a report incomplete; findings alone do not.
+
+each output stream contains a one MiB preview. if `outputTruncated` is true, `outputFile` and `errorOutputFile` point to complete raw logs. these private files are on the checking host; MCP clients need authorized filesystem access there to read or filter them. preview truncation alone does not make a check incomplete. logs older than 24 hours are removed on the next check of that project; small outputs need no retained files.
 
 ## mcp
 

@@ -37,6 +37,12 @@ final class exception extends \InvalidArgumentException
     {
         return new self('Timeout must be between 1 and 600 seconds and every selected tool must be supported.');
     }
+
+    /** Prevent reporting success when native diagnostics could not be retained. */
+    public static function outputStorageFailed(): self
+    {
+        return new self('Could not preserve the complete analyzer output.');
+    }
 }
 
 enum status: string
@@ -110,7 +116,9 @@ final readonly class result implements \JsonSerializable
         public string $output = '',
         public string $errorOutput = '',
         public float $seconds = 0.0,
-        public bool $outputTruncated = false
+        public bool $outputTruncated = false,
+        public ?string $outputFile = null,
+        public ?string $errorOutputFile = null
     ) {}
 
     /**
@@ -131,7 +139,9 @@ final readonly class result implements \JsonSerializable
             'output' => $this->output,
             'errorOutput' => $this->errorOutput,
             'seconds' => $this->seconds,
-            'outputTruncated' => $this->outputTruncated
+            'outputTruncated' => $this->outputTruncated,
+            'outputFile' => $this->outputFile,
+            'errorOutputFile' => $this->errorOutputFile
         ];
     }
 }
