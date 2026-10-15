@@ -37,7 +37,7 @@ the PHP library is available on [packagist](https://packagist.org/packages/vielh
 
 these 14 checks cover syntax, formatting, linting, refactoring suggestions and static analysis. they use default or project-configured rules, not every available rule or plugin. they do not include every available analyzer. dependency audits (`composer audit`, `npm audit`) and dedicated security scanning such as semgrep are not bundled; npm audit sends dependency information to the configured registry.
 
-project executables take precedence over central tools, then PATH. existing project configurations are used where supported; otherwise the bundled defaults apply (including PSR-12, PHPStan level 6 and Psalm level 3). different formatters can disagree, so style findings remain separate.
+project executables take precedence over central tools, then PATH. existing project configurations are used where supported; otherwise the bundled defaults apply (including PSR-12, PHPStan level 6 and Psalm level 3). typescript maintains the project's type resolution, file selection and rules by using `tsconfig.json` or `jsconfig.json` directly. only output and incremental cache locations are overridden. different formatters can disagree, so style findings remain separate.
 
 ## cli
 

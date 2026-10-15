@@ -172,24 +172,29 @@ final class runner
                 $targets = [];
             }
             if ($tool === tool::TypeScript) {
-                $configuration = [
-                    'extends' =>
-                        $workspace->configuration('tsconfig.json', 'jsconfig.json') ??
-                        $configurationDirectory . '/typescript.json',
-                    'compilerOptions' => [
-                        'allowJs' => true,
-                        'checkJs' => true,
-                        'noEmit' => true,
-                        'incremental' => true,
-                        'tsBuildInfoFile' => $cache . '/typescript.tsbuildinfo',
-                        'typeRoots' => [$workspace->root . '/node_modules/@types']
-                    ],
-                    'files' => $files,
-                    'include' => []
+                $existing = $workspace->configuration('tsconfig.json', 'jsconfig.json');
+                if ($existing === null) {
+                    $configuration = [
+                        'extends' => $configurationDirectory . '/typescript.json',
+                        'compilerOptions' => [
+                            'allowJs' => true,
+                            'checkJs' => true,
+                            'typeRoots' => [$workspace->root . '/node_modules/@types']
+                        ],
+                        'files' => $files,
+                        'include' => []
+                    ];
+                    file_put_contents($cache . '/typescript.json', json_encode($configuration, JSON_THROW_ON_ERROR));
+                }
+                $arguments = [
+                    ...$arguments,
+                    '--project',
+                    $existing ?? $cache . '/typescript.json',
+                    '--noEmit',
+                    '--incremental',
+                    '--tsBuildInfoFile',
+                    $cache . '/typescript.tsbuildinfo'
                 ];
-                file_put_contents($cache . '/typescript.json', json_encode($configuration, JSON_THROW_ON_ERROR));
-                $arguments[] = '--project';
-                $arguments[] = $cache . '/typescript.json';
                 $targets = [];
             }
             if (
