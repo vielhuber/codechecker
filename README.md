@@ -7,13 +7,11 @@
 
 # ⌨️codechecker⌨️
 
-codechecker runs read-only PHP, JavaScript and TypeScript checks through a PHP library, a CLI or an MCP server. pass a project directory, individual files or both; each tool keeps its own diagnostics.
+read-only php/js/ts checks via lib, cli & mcp. dirs, files or both.
 
-## installation
+## setup
 
-requires PHP 8.5 with `proc_open` enabled. Node.js 24 or newer is needed for the JavaScript tools, not for PHP-only checks.
-
-for a central installation with all tools, use a checkout:
+php ≥ 8.5 (`proc_open`); node ≥ 24 for js/ts.
 
 ```sh
 git clone https://github.com/vielhuber/codechecker.git
@@ -24,51 +22,43 @@ tools/vendor/bin/mago --version
 npm install --no-audit --no-fund
 ```
 
-install once centrally, not in every project. composer installs the PHP dependencies; npm downloads the separate JavaScript tools and their dependencies. PHP starts their executables directly during checks, without invoking npm. skip the npm step for PHP-only use. the mago command downloads its native binary once; checks never install missing tools.
-
-the PHP library is available on [packagist](https://packagist.org/packages/vielhuber/codechecker): `composer require vielhuber/codechecker`. no npm release is needed. the central tool installations above are still separate. target projects need their normal dependencies and analysis plugins for meaningful framework and type checks.
+once centrally, not per proj. skip npm for php-only. lib: `composer require vielhuber/codechecker` via [packagist](https://packagist.org/packages/vielhuber/codechecker); tools installed separately. target deps/plugins required.
 
 ## tools
 
-| language                | checks                                                                                                          |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------- |
-| PHP                     | `php-syntax`, `mago-format`, `mago-lint`, `mago-analyze`, `rector`, `php-cs-fixer`, `psalm`, `phpstan`, `phpcs` |
-| JavaScript / TypeScript | `eslint`, `biome`, `prettier`, `typescript`, `oxlint`                                                           |
+| lang  | checks                                                                                                          |
+| ----- | --------------------------------------------------------------------------------------------------------------- |
+| php   | `php-syntax`, `mago-format`, `mago-lint`, `mago-analyze`, `rector`, `php-cs-fixer`, `psalm`, `phpstan`, `phpcs` |
+| js/ts | `eslint`, `biome`, `prettier`, `typescript`, `oxlint`                                                           |
 
-these 14 checks cover syntax, formatting, linting, refactoring suggestions and static analysis. they use default or project-configured rules, not every available rule or plugin. they do not include every available analyzer. dependency audits (`composer audit`, `npm audit`) and dedicated security scanning such as semgrep are not bundled; npm audit sends dependency information to the configured registry.
-
-project executables take precedence over central tools, then PATH. existing project configurations are used where supported; otherwise the bundled defaults apply (including PSR-12, PHPStan level 6 and Psalm level 3). typescript maintains the project's type resolution, file selection and rules by using `tsconfig.json` or `jsconfig.json` directly. only output and incremental cache locations are overridden. different formatters can disagree, so style findings remain separate.
+proj bins/cfg first, central bins/defaults next, system bins last. defaults: psr-12, phpstan lvl 6, psalm lvl 3. ts keeps proj cfg. type analysis remains proj-wide, even with file paths. no dep audits or dedicated security scans.
 
 ## cli
 
 ```sh
-php src/codechecker-cli.php --root=/var/www/project .
-php src/codechecker-cli.php --root=/var/www/project --tools=phpstan,psalm,eslint,typescript src public/app.js
-php src/codechecker-cli.php --root=/var/www/project --list-tools
+php src/codechecker-cli.php --root=/var/www/proj .
+php src/codechecker-cli.php --root=/var/www/proj --tools=php-syntax,eslint src/demo.php public/demo.js
+php src/codechecker-cli.php --root=/var/www/proj --list-tools
 ```
 
-options precede paths; `--` ends option parsing. `--timeout=120` sets the limit per tool invocation (1–600 seconds). output is JSON: `0` means passed, `1` means findings, `2` means invalid input or an incomplete check.
+json; exit: `0` ok, `1` findings, `2` incomplete/invalid. timeout: 120s/tool (1-600). opts before paths; `--` ends opts.
 
 ## php
 
 ```php
 <?php
 declare(strict_types=1);
+require 'vendor/autoload.php';
 
-require __DIR__ . '/vendor/autoload.php';
+$report = (new \vielhuber\codechecker\codechecker(root: '/var/www/proj'))->check(
+    paths: ['src/demo.php', 'public/demo.js'],
+    tools: ['php-syntax', 'eslint']
+);
 
-use vielhuber\codechecker\codechecker;
-
-$checker = new codechecker(root: '/var/www/project');
-$report = $checker->check(paths: ['src', 'public/app.js'], tools: ['phpstan', 'eslint']);
-
-echo json_encode($report, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
-exit($report->exitCode());
+echo json_encode($report);
 ```
 
-omit `tools` to run every applicable check. reports contain `files`, native tool `results`, `complete` and `passed`. unavailable tools, execution errors, timeouts or failed output capture make a report incomplete; findings alone do not.
-
-each output stream contains a one MiB preview. if `outputTruncated` is true, `outputFile` and `errorOutputFile` point to complete raw logs. these private files are on the checking host; MCP clients need authorized filesystem access there to read or filter them. preview truncation alone does not make a check incomplete. logs older than 24 hours are removed on the next check of that project; small outputs need no retained files.
+report: `files`, `results`, `complete` ≠ `passed`. errors/timeouts/missing bins → incomplete. preview: 1 mib/stream; full logs via `outputFile`/`errorOutputFile` if cut. host fs access required. logs > 24 h deleted on next proj check.
 
 ## mcp
 
@@ -84,9 +74,9 @@ each output stream contains a one MiB preview. if `outputTruncated` is true, `ou
 }
 ```
 
-- `list_tools(project: "shop")` lists checks and resolved executables.
-- `check_code(project: "shop", paths: ["src"], tools: ["phpstan"])` checks the selected project.
+- `list_tools(project: "shop")`: bins/checks.
+- `check_code(project: "shop", paths: ["src/demo.php"], tools: ["php-syntax"])`: run.
 
-`project` defaults to `"."`; empty `paths` selects the whole project, empty `tools` selects all checks. paths and projects cannot escape `CODECHECKER_ROOT`.
+proj default: `"."`. empty paths: whole proj; empty tools: all checks. paths stay inside `CODECHECKER_ROOT`.
 
-stdio needs no token. for HTTP, copy `.env.example` to `.env`, set `CODECHECKER_ROOT` and a random `MCP_TOKEN`, and expose `src/mcp-server.php` over HTTPS. require `Authorization: Bearer <MCP_TOKEN>` and block web access to `.env`; requests without a valid token are rejected.
+stdio: no token. http: copy `.env.example` → `.env`, set `CODECHECKER_ROOT` + random `MCP_TOKEN`; serve via https with `Authorization: Bearer <MCP_TOKEN>`. deny web access to `.env`. trusted cfg/plugins only; root bound ≠ sandbox.
