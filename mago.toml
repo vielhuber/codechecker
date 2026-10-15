@@ -1,0 +1,6 @@
+version = "1.57.0"
+php-version = "8.5"
+
+[source]
+paths = ["src", "config"]
+includes = ["vendor", "tools/vendor/rector/rector/src", "tools/vendor/friendsofphp/php-cs-fixer/src"]

@@ -1,0 +1,18 @@
+{
+    "name": "vielhuber/codechecker-tools",
+    "type": "project",
+    "description": "Isolated, pinned PHP tools for codechecker.",
+    "license": "MIT",
+    "require": {
+        "php": "^8.5",
+        "carthage-software/mago": "^1.57",
+        "rector/rector": "^2.7",
+        "friendsofphp/php-cs-fixer": "^3.95",
+        "vimeo/psalm": "^6.20",
+        "phpstan/phpstan": "^2.3",
+        "squizlabs/php_codesniffer": "^4.0"
+    },
+    "config": {
+        "allow-plugins": false
+    }
+}

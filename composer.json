@@ -1,0 +1,36 @@
+{
+    "name": "vielhuber/codechecker",
+    "description": "Read-only PHP and JavaScript code checks through a PHP API, CLI and MCP server.",
+    "license": "MIT",
+    "require": {
+        "php": "^8.5",
+        "ext-dom": "*",
+        "ext-json": "*",
+        "symfony/process": "^8.1",
+        "vielhuber/simplemcp": "^1.1.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "vielhuber\\codechecker\\": "src/"
+        }
+    },
+    "bin": [
+        "src/codechecker-cli.php",
+        "src/mcp-server.php"
+    ],
+    "archive": {
+        "exclude": [
+            "/.env",
+            "/mcp-server.log",
+            "/vendor/",
+            "/tools/vendor/",
+            "/node_modules/",
+            "/.cache/",
+            "/composer.lock",
+            "/package-lock.json"
+        ]
+    },
+    "scripts": {
+        "check": "@php src/codechecker-cli.php --root=. ."
+    }
+}

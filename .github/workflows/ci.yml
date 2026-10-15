@@ -1,0 +1,53 @@
+name: CI
+
+env:
+    CI: true
+
+on:
+    workflow_dispatch:
+    push:
+        branches:
+            - main
+        tags:
+            - 'v*'
+            - '[0-9]*'
+    pull_request:
+
+jobs:
+    check:
+        runs-on: ubuntu-latest
+        name: PHP 8.5 / Node.js LTS
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+
+            - name: PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.5'
+                  extensions: dom, json, mbstring, simplexml, tokenizer, xml
+                  tools: composer
+
+            - name: Node.js
+              uses: actions/setup-node@v6
+              with:
+                  node-version-file: '.nvmrc'
+
+            - name: Dependencies
+              run: |
+                  composer install --no-interaction --no-progress
+                  composer install --working-dir=tools --no-interaction --no-progress
+                  npm install --no-audit --no-fund
+                  tools/vendor/bin/mago --version
+
+            - name: Package validation
+              run: |
+                  composer validate --strict
+                  composer validate --strict --working-dir=tools
+
+            - name: Formatting
+              run: npm run format:check
+
+            - name: Syntax and static analysis
+              run: php src/codechecker-cli.php --root=. --tools=php-syntax,mago-analyze,phpstan,psalm,eslint,biome,typescript,oxlint .
