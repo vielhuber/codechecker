@@ -4,14 +4,10 @@ env:
     CI: true
 
 on:
-    workflow_dispatch:
     push:
-        branches:
-            - main
         tags:
             - 'v*'
             - '[0-9]*'
-    pull_request:
 
 jobs:
     check:
