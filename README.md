@@ -13,7 +13,7 @@ codechecker runs read-only PHP, JavaScript and TypeScript checks through a PHP l
 
 requires PHP 8.5 with `proc_open` enabled. Node.js 24 or newer is needed for the JavaScript tools, not for PHP-only checks.
 
-until the package is available on packagist, use a checkout:
+for a central installation with all tools, use a checkout:
 
 ```sh
 git clone https://github.com/vielhuber/codechecker.git
@@ -24,9 +24,9 @@ tools/vendor/bin/mago --version
 npm install --no-audit --no-fund
 ```
 
-install once centrally, not in every project. npm only installs the JavaScript tools; PHP starts their executables directly during checks. skip the npm step for PHP-only use. the mago command downloads its native binary once; checks never install missing tools.
+install once centrally, not in every project. composer installs the PHP dependencies; npm downloads the separate JavaScript tools and their dependencies. PHP starts their executables directly during checks, without invoking npm. skip the npm step for PHP-only use. the mago command downloads its native binary once; checks never install missing tools.
 
-after publication, `composer require vielhuber/codechecker` installs the PHP library. the central tool installations above are still separate. target projects need their normal dependencies and analysis plugins for meaningful framework and type checks.
+the PHP library is available on [packagist](https://packagist.org/packages/vielhuber/codechecker): `composer require vielhuber/codechecker`. no npm release is needed. the central tool installations above are still separate. target projects need their normal dependencies and analysis plugins for meaningful framework and type checks.
 
 ## tools
 
@@ -88,22 +88,3 @@ omit `tools` to run every applicable check. reports contain `files`, native tool
 `project` defaults to `"."`; empty `paths` selects the whole project, empty `tools` selects all checks. paths and projects cannot escape `CODECHECKER_ROOT`.
 
 stdio needs no token. for HTTP, copy `.env.example` to `.env`, set `CODECHECKER_ROOT` and a random `MCP_TOKEN`, and expose `src/mcp-server.php` over HTTPS. require `Authorization: Bearer <MCP_TOKEN>` and block web access to `.env`; requests without a valid token are rejected.
-
-## scope and safety
-
-supports `.php`, `.phtml`, `.inc`, `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.mts`, `.cts` and `.tsx`. directory scans skip symlinks, `.git`, `vendor`, `node_modules`, build directories, `coverage` and `.cache`. explicit files must remain inside the project root.
-
-mago analysis, PHPStan, Psalm and TypeScript run project-wide even for selected files; existing Psalm configurations retain their own scope. TypeScript also checks JavaScript without emitting files. analyze monorepo packages separately and use framework-specific tools for embedded Vue, Svelte or HTML code.
-
-no fixes or package installations run during checks. project configurations and plugins are executable code, however: path boundaries are not an operating-system sandbox. run untrusted projects in an isolated environment. static checks do not replace tests or application review.
-
-## development
-
-```sh
-composer validate --strict
-composer validate --strict --working-dir=tools
-npm run format:check
-composer check
-```
-
-CI uses the canonical prettier formatting and the syntax/static-analysis profile. `composer check` additionally runs the overlapping style and refactoring checks, which may report conflicting rules. PHP tool versions are locked separately under `tools`; JavaScript tools have exact direct versions in `package.json`.
