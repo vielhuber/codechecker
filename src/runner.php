@@ -7,7 +7,7 @@ use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Exception\RuntimeException as ProcessException;
 use Symfony\Component\Process\Process;
 
-final class ToolRunner
+final class runner
 {
     private const OUTPUT_LIMIT = 1048576;
 
@@ -16,14 +16,14 @@ final class ToolRunner
      *
      * @param list<string> $files
      */
-    public function run(Tool $tool, Workspace $workspace, array $files, int $timeout): ToolResult
+    public function run(tool $tool, workspace $workspace, array $files, int $timeout): result
     {
         $scope = $tool->projectWide() ? 'project' : 'files';
-        $binary = new ToolLocator()->find($tool, $workspace);
+        $binary = $this->locate($tool, $workspace);
         if ($binary === null) {
-            return new ToolResult(
+            return new result(
                 tool: $tool,
-                status: Status::Unavailable,
+                status: status::Unavailable,
                 scope: $scope,
                 files: $files,
                 errorOutput: 'Executable not found: ' . $tool->executable()
@@ -31,9 +31,9 @@ final class ToolRunner
         }
         $cache = sys_get_temp_dir() . '/codechecker-' . bin2hex(random_bytes(12));
         if (!mkdir($cache, 0700)) {
-            return new ToolResult(
+            return new result(
                 tool: $tool,
-                status: Status::Error,
+                status: status::Error,
                 scope: $scope,
                 files: $files,
                 errorOutput: 'Could not create a private working directory.'
@@ -45,15 +45,15 @@ final class ToolRunner
         $errorOutput = '';
         $truncated = false;
         $exitCode = null;
-        $status = Status::Error;
+        $status = status::Error;
         try {
             $configurationDirectory = __DIR__ . '/../config';
             $arguments = match ($tool) {
-                Tool::PhpSyntax => ['-l'],
-                Tool::MagoFormat => ['--threads=2', 'format', '--check'],
-                Tool::MagoLint => ['--threads=2', 'lint', '--reporting-format=json'],
-                Tool::MagoAnalyze => ['--threads=2', 'analyze', '--reporting-format=json'],
-                Tool::Rector => [
+                tool::PhpSyntax => ['-l'],
+                tool::MagoFormat => ['--threads=2', 'format', '--check'],
+                tool::MagoLint => ['--threads=2', 'lint', '--reporting-format=json'],
+                tool::MagoAnalyze => ['--threads=2', 'analyze', '--reporting-format=json'],
+                tool::Rector => [
                     'process',
                     '--dry-run',
                     '--no-progress-bar',
@@ -63,7 +63,7 @@ final class ToolRunner
                     ($workspace->configuration('rector.php', 'rector.php.dist') ??
                         $configurationDirectory . '/rector.php')
                 ],
-                Tool::PhpCsFixer => [
+                tool::PhpCsFixer => [
                     'check',
                     '--format=json',
                     '--using-cache=no',
@@ -72,29 +72,29 @@ final class ToolRunner
                     ($workspace->configuration('.php-cs-fixer.php', '.php-cs-fixer.dist.php') ??
                         $configurationDirectory . '/php-cs-fixer.php')
                 ],
-                Tool::Psalm => [
+                tool::Psalm => [
                     '--output-format=json',
                     '--no-progress',
                     '--no-cache',
                     '--threads=1',
                     '--root=' . $workspace->root
                 ],
-                Tool::PhpStan => ['analyse', '--no-progress', '--error-format=json'],
-                Tool::PhpCodeSniffer => [
+                tool::PhpStan => ['analyse', '--no-progress', '--error-format=json'],
+                tool::PhpCodeSniffer => [
                     '--report=json',
                     '--extensions=php,phtml,inc',
                     '--standard=' .
                     ($workspace->configuration('phpcs.xml', '.phpcs.xml', 'phpcs.xml.dist', '.phpcs.xml.dist') ??
                         'PSR12')
                 ],
-                Tool::Eslint => ['--format=json', '--max-warnings=0'],
-                Tool::Biome => ['check', '--reporter=json', '--max-diagnostics=none', '--error-on-warnings'],
-                Tool::Prettier => ['--check'],
-                Tool::TypeScript => ['--pretty', 'false'],
-                Tool::Oxlint => ['--format=json', '--deny-warnings', '--threads=2']
+                tool::Eslint => ['--format=json', '--max-warnings=0'],
+                tool::Biome => ['check', '--reporter=json', '--max-diagnostics=none', '--error-on-warnings'],
+                tool::Prettier => ['--check'],
+                tool::TypeScript => ['--pretty', 'false'],
+                tool::Oxlint => ['--format=json', '--deny-warnings', '--threads=2']
             };
             $targets = $files;
-            if ($tool === Tool::MagoAnalyze) {
+            if ($tool === tool::MagoAnalyze) {
                 $existing = $workspace->configuration('mago.toml');
                 $configuration =
                     $existing === null
@@ -116,7 +116,7 @@ final class ToolRunner
                 $arguments = ['--config=' . $cache . '/mago.toml', ...$arguments];
                 $targets = [];
             }
-            if ($tool === Tool::PhpStan) {
+            if ($tool === tool::PhpStan) {
                 $configuration = ['parameters' => ['paths' => $files, 'tmpDir' => $cache . '/phpstan']];
                 $existing = $workspace->configuration(
                     'phpstan.neon',
@@ -134,7 +134,7 @@ final class ToolRunner
                 $arguments[] = '--configuration=' . $cache . '/phpstan.php';
                 $targets = [];
             }
-            if ($tool === Tool::Psalm) {
+            if ($tool === tool::Psalm) {
                 $existing = $workspace->configuration('psalm.xml', 'psalm.xml.dist');
                 if ($existing !== null) {
                     $arguments[] = '--config=' . $existing;
@@ -171,7 +171,7 @@ final class ToolRunner
                 }
                 $targets = [];
             }
-            if ($tool === Tool::TypeScript) {
+            if ($tool === tool::TypeScript) {
                 $configuration = [
                     'extends' =>
                         $workspace->configuration('tsconfig.json', 'jsconfig.json') ??
@@ -193,7 +193,7 @@ final class ToolRunner
                 $targets = [];
             }
             if (
-                $tool === Tool::Eslint &&
+                $tool === tool::Eslint &&
                 $workspace->configuration(
                     'eslint.config.js',
                     'eslint.config.mjs',
@@ -232,50 +232,50 @@ final class ToolRunner
                 $process->clearErrorOutput();
             });
             $findingCodes = match ($tool) {
-                Tool::PhpSyntax => [255],
-                Tool::Rector, Tool::Psalm => [2],
-                Tool::PhpCsFixer => [4, 8, 12],
-                Tool::PhpCodeSniffer => [1, 2, 3],
-                Tool::TypeScript => [1, 2],
+                tool::PhpSyntax => [255],
+                tool::Rector, tool::Psalm => [2],
+                tool::PhpCsFixer => [4, 8, 12],
+                tool::PhpCodeSniffer => [1, 2, 3],
+                tool::TypeScript => [1, 2],
                 default => [1]
             };
             $status =
                 $exitCode === 0
-                    ? Status::Passed
+                    ? status::Passed
                     : (in_array($exitCode, $findingCodes, true)
-                        ? Status::Findings
-                        : Status::Error);
-            if ($tool === Tool::PhpStan && $exitCode !== 0) {
+                        ? status::Findings
+                        : status::Error);
+            if ($tool === tool::PhpStan && $exitCode !== 0) {
                 $diagnostics = $this->diagnosticObject(json_decode($output, true));
                 if ($diagnostics === null || ($diagnostics['errors'] ?? []) !== []) {
-                    $status = Status::Error;
+                    $status = status::Error;
                 }
             }
             if (
-                in_array($tool, [Tool::PhpCodeSniffer, Tool::Biome], true) &&
+                in_array($tool, [tool::PhpCodeSniffer, tool::Biome], true) &&
                 $exitCode !== 0 &&
                 $this->diagnosticObject(json_decode($output, true)) === null
             ) {
-                $status = Status::Error;
+                $status = status::Error;
             }
             if (
-                $tool === Tool::TypeScript &&
+                $tool === tool::TypeScript &&
                 $exitCode !== 0 &&
                 preg_match('/error TS(?:5[0-9]{3}|6[0-9]{3}|1800[23]):/', $output . $errorOutput) === 1
             ) {
-                $status = Status::Error;
+                $status = status::Error;
             }
-            if (in_array($tool, [Tool::MagoLint, Tool::MagoAnalyze], true) && $exitCode === 0) {
+            if (in_array($tool, [tool::MagoLint, tool::MagoAnalyze], true) && $exitCode === 0) {
                 $diagnostics = $this->diagnosticObject(json_decode($output, true));
                 if ($diagnostics !== null && ($diagnostics['issues'] ?? []) !== []) {
-                    $status = Status::Findings;
+                    $status = status::Findings;
                 }
             }
             if ($truncated) {
-                $status = Status::Error;
+                $status = status::Error;
             }
         } catch (ProcessTimedOutException $exception) {
-            $status = Status::Timeout;
+            $status = status::Timeout;
             $errorOutput .= $exception->getMessage();
         } catch (ProcessException | \JsonException $exception) {
             $errorOutput .= $exception->getMessage();
@@ -297,7 +297,7 @@ final class ToolRunner
             }
             rmdir($cache);
         }
-        return new ToolResult(
+        return new result(
             tool: $tool,
             status: $status,
             scope: $scope,
@@ -319,5 +319,40 @@ final class ToolRunner
     private function diagnosticObject(mixed $decoded): ?array
     {
         return is_array($decoded) ? $decoded : null;
+    }
+
+    /** Resolve versions in the target project before centrally installed tools. */
+    public function locate(tool $tool, workspace $workspace): ?string
+    {
+        if ($tool === tool::PhpSyntax) {
+            return PHP_BINARY;
+        }
+        $candidates = [
+            $workspace->root . '/vendor/bin/' . $tool->executable(),
+            $workspace->root . '/node_modules/.bin/' . $tool->executable(),
+            __DIR__ . '/../tools/vendor/bin/' . $tool->executable(),
+            __DIR__ . '/../node_modules/.bin/' . $tool->executable(),
+            new \Symfony\Component\Process\ExecutableFinder()->find($tool->executable())
+        ];
+        foreach ($candidates as $path) {
+            if ($path === null || !is_file($path) || !is_executable($path)) {
+                continue;
+            }
+            if (
+                $tool->executable() === 'mago' &&
+                str_contains((string) file_get_contents($path, length: 512), '<?php')
+            ) {
+                $binaries = glob(dirname($path) . '/../carthage-software/mago/composer/bin/*/mago-*/mago') ?: [];
+                rsort($binaries, SORT_NATURAL);
+                foreach ($binaries as $binary) {
+                    if (is_executable($binary)) {
+                        return $binary;
+                    }
+                }
+                continue;
+            }
+            return $path;
+        }
+        return null;
     }
 }

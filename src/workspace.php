@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace vielhuber\codechecker;
 
-final readonly class Workspace
+final readonly class workspace
 {
     public const PHP_EXTENSIONS = ['php', 'phtml', 'inc'];
     public const JAVASCRIPT_EXTENSIONS = ['js', 'mjs', 'cjs', 'jsx', 'ts', 'mts', 'cts', 'tsx'];
@@ -26,7 +26,7 @@ final readonly class Workspace
     {
         $resolved = realpath($root);
         if ($resolved === false || !is_dir($resolved) || !is_readable($resolved)) {
-            throw CodecheckerException::invalidRoot($root);
+            throw exception::invalidRoot($root);
         }
         $this->root = $resolved;
     }
@@ -39,7 +39,7 @@ final readonly class Workspace
             $resolved === false ||
             ($resolved !== $this->root && !str_starts_with($resolved, rtrim($this->root, '/') . '/'))
         ) {
-            throw CodecheckerException::invalidPath($path);
+            throw exception::invalidPath($path);
         }
         return $resolved;
     }
@@ -63,7 +63,7 @@ final readonly class Workspace
                         true
                     )
                 ) {
-                    throw CodecheckerException::unsupportedFile($path);
+                    throw exception::unsupportedFile($path);
                 }
                 $files[$resolved] = $resolved;
                 continue;
@@ -90,7 +90,7 @@ final readonly class Workspace
                 }
                 $source = $this->resolve($file->getPathname());
                 if (!is_readable($source)) {
-                    throw CodecheckerException::unsupportedFile($source);
+                    throw exception::unsupportedFile($source);
                 }
                 $files[$source] = $source;
             }

@@ -8,14 +8,13 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__ . '/autoload.php';
 
-use vielhuber\codechecker\CodecheckerException;
-use vielhuber\codechecker\Report;
-use vielhuber\codechecker\Tool;
+use vielhuber\codechecker\exception;
+use vielhuber\codechecker\report;
 use vielhuber\codechecker\codechecker;
 
 try {
     $root = null;
-    $tools = null;
+    $tools = [];
     $paths = [];
     $timeout = 120;
     $listTools = false;
@@ -43,10 +42,7 @@ try {
             continue;
         }
         if ($options && str_starts_with($argument, '--tools=')) {
-            $tools = array_map(
-                static fn(string $tool): Tool => Tool::tryFrom($tool) ?? throw CodecheckerException::invalidOptions(),
-                explode(',', substr($argument, 8))
-            );
+            $tools = explode(',', substr($argument, 8));
             continue;
         }
         if ($options && preg_match('/^--timeout=([1-9][0-9]*)$/', $argument, $matches) === 1) {
@@ -54,12 +50,12 @@ try {
             continue;
         }
         if ($options && str_starts_with($argument, '-')) {
-            throw CodecheckerException::invalidOptions();
+            throw exception::invalidOptions();
         }
         $paths[] = $argument;
     }
-    $checker = new codechecker(root: $root, timeout: $timeout);
-    $report = $listTools ? $checker->listTools() : $checker->check(paths: $paths, tools: $tools);
+    $checker = new codechecker(root: $root);
+    $report = $listTools ? $checker->listTools() : $checker->check(paths: $paths, tools: $tools, timeout: $timeout);
     fwrite(
         STDOUT,
         json_encode(
@@ -67,8 +63,8 @@ try {
             JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
         ) . PHP_EOL
     );
-    exit($report instanceof Report ? $report->exitCode() : 0);
-} catch (CodecheckerException | \UnexpectedValueException | \JsonException $exception) {
+    exit($report instanceof report ? $report->exitCode() : 0);
+} catch (exception | \UnexpectedValueException | \JsonException $exception) {
     fwrite(STDERR, $exception->getMessage() . PHP_EOL);
     exit(2);
 }

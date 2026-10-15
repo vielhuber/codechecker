@@ -104,7 +104,6 @@ declare(strict_types=1);
 require __DIR__ . '/vendor/autoload.php';
 
 use vielhuber\codechecker\codechecker;
-use vielhuber\codechecker\Tool;
 
 $checker = new codechecker(root: '/var/www/project');
 $report = $checker->check(paths: ['src', 'public/app.js']);
@@ -113,12 +112,12 @@ echo json_encode($report, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
 exit($report->exitCode());
 ```
 
-Werkzeuge lassen sich auch über das Enum auswählen:
+Werkzeuge lassen sich auch über ihre Kennungen auswählen:
 
 ```php
 $report = $checker->check(
     paths: ['src/Invoice.php'],
-    tools: [Tool::PhpStan, Tool::Psalm]
+    tools: ['phpstan', 'psalm']
 );
 
 $available = $checker->listTools();
