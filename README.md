@@ -1,101 +1,55 @@
 [![build status](https://github.com/vielhuber/codechecker/actions/workflows/ci.yml/badge.svg)](https://github.com/vielhuber/codechecker/actions)
-[![GitHub Tag](https://img.shields.io/github/v/tag/vielhuber/codechecker)](https://github.com/vielhuber/codechecker/tags)
-[![Code Style](https://img.shields.io/badge/code_style-psr--12-ff69b4.svg)](https://www.php-fig.org/psr/psr-12/)
-[![License](https://img.shields.io/github/license/vielhuber/codechecker)](https://github.com/vielhuber/codechecker/blob/main/LICENSE.md)
-[![Last Commit](https://img.shields.io/github/last-commit/vielhuber/codechecker)](https://github.com/vielhuber/codechecker/commits)
-[![PHP Version Support](https://img.shields.io/packagist/php-v/vielhuber/codechecker)](https://packagist.org/packages/vielhuber/codechecker)
-[![Packagist Downloads](https://img.shields.io/packagist/dt/vielhuber/codechecker)](https://packagist.org/packages/vielhuber/codechecker)
+[![github tag](https://img.shields.io/github/v/tag/vielhuber/codechecker)](https://github.com/vielhuber/codechecker/tags)
+[![license](https://img.shields.io/github/license/vielhuber/codechecker)](https://github.com/vielhuber/codechecker/blob/main/LICENSE.md)
+[![last commit](https://img.shields.io/github/last-commit/vielhuber/codechecker)](https://github.com/vielhuber/codechecker/commits)
+[![php version support](https://img.shields.io/packagist/php-v/vielhuber/codechecker)](https://packagist.org/packages/vielhuber/codechecker)
+[![packagist downloads](https://img.shields.io/packagist/dt/vielhuber/codechecker)](https://packagist.org/packages/vielhuber/codechecker)
 
 # ⌨️codechecker⌨️
 
-Will man PHP- und JavaScript-Projekte mit mehreren Werkzeugen prüfen, unterscheiden sich Installation, Konfiguration und Ausgabe erheblich. codechecker bündelt diese Prüfungen hinter einer PHP-Bibliothek, einer CLI und einem MCP-Server.
+codechecker runs read-only PHP, JavaScript and TypeScript checks through a PHP library, a CLI or an MCP server. pass a project directory, individual files or both; each tool keeps its own diagnostics.
 
-Man übergibt einen Projektordner, einzelne Dateien oder eine Kombination daraus. Die Werkzeuge laufen ohne Fix-Optionen; fehlende Programme, Konfigurationsfehler und Zeitüberschreitungen bleiben als eigene Ergebnisse sichtbar.
+## installation
 
-## Voraussetzungen
+requires PHP 8.5 with `proc_open` enabled. Node.js 24 or newer is needed for the JavaScript tools, not for PHP-only checks.
 
-codechecker benötigt PHP 8.5 mit DOM, JSON und aktiviertem `proc_open` sowie Node.js 24 zum Ausführen der JavaScript-Werkzeuge. Die vorbereitete Umgebung ist für Linux und macOS gedacht.
-
-Die Werkzeuge werden einmal in der zentralen Installation eingerichtet, nicht in jedem geprüften Projekt. Dessen normale Composer- bzw. npm-Abhängigkeiten müssen für eine belastbare Typ- und Frameworkanalyse trotzdem vorhanden sein.
-
-## Installation
-
-Solange das Paket noch nicht auf Packagist veröffentlicht ist, verwendet man den Checkout:
+until the package is available on packagist, use a checkout:
 
 ```sh
 git clone https://github.com/vielhuber/codechecker.git
 cd codechecker
 composer install
 composer install --working-dir=tools
-npm install
 tools/vendor/bin/mago --version
+npm install --no-audit --no-fund
 ```
 
-Der letzte Aufruf lädt das zur festgelegten Mago-Version passende Binary. Die eigentlichen Prüfläufe installieren keine Pakete und sollen nur das bereits heruntergeladene Binary verwenden.
+install once centrally, not in every project. npm only installs the JavaScript tools; PHP starts their executables directly during checks. skip the npm step for PHP-only use. the mago command downloads its native binary once; checks never install missing tools.
 
-Nach der Veröffentlichung lässt sich die PHP-Bibliothek auch über Composer einbinden:
+after publication, `composer require vielhuber/codechecker` installs the PHP library. the central tool installations above are still separate. target projects need their normal dependencies and analysis plugins for meaningful framework and type checks.
 
-```sh
-composer require vielhuber/codechecker
-```
+## tools
 
-Die Analyseprogramme werden dabei nicht als Abhängigkeiten in das Anwendungsprojekt gezogen. Für den vollständigen zentralen Werkzeugbestand bleiben die Installation unter "tools" und die npm-Installation im Paketverzeichnis erforderlich.
+| language                | checks                                                                                                          |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| PHP                     | `php-syntax`, `mago-format`, `mago-lint`, `mago-analyze`, `rector`, `php-cs-fixer`, `psalm`, `phpstan`, `phpcs` |
+| JavaScript / TypeScript | `eslint`, `biome`, `prettier`, `typescript`, `oxlint`                                                           |
 
-## Werkzeuge
+these 14 checks cover syntax, formatting, linting, refactoring suggestions and static analysis. they use default or project-configured rules, not every available rule or plugin. they do not include every available analyzer. dependency audits (`composer audit`, `npm audit`) and dedicated security scanning such as semgrep are not bundled; npm audit sends dependency information to the configured registry.
 
-| Kennung        | Werkzeug                                                             | Prüfung                                      |
-| -------------- | -------------------------------------------------------------------- | -------------------------------------------- |
-| `php-syntax`   | PHP                                                                  | Syntax mit der verwendeten PHP-Laufzeit      |
-| `mago-format`  | [Mago](https://github.com/carthage-software/mago)                    | Formatierung                                 |
-| `mago-lint`    | Mago                                                                 | Lint-Regeln                                  |
-| `mago-analyze` | Mago                                                                 | Projektweite Typ- und Kontrollflussanalyse   |
-| `rector`       | [Rector](https://github.com/rectorphp/rector)                        | Vorgeschlagene Refactorings als Dry-run      |
-| `php-cs-fixer` | [PHP CS Fixer](https://cs.symfony.com/)                              | Coding Standards im Check-Modus              |
-| `psalm`        | [Psalm](https://psalm.dev/)                                          | Projektweite statische Analyse               |
-| `phpstan`      | [PHPStan](https://phpstan.org/)                                      | Projektweite statische Analyse               |
-| `phpcs`        | [PHP_CodeSniffer](https://github.com/PHPCSStandards/PHP_CodeSniffer) | Coding Standards                             |
-| `eslint`       | [ESLint](https://eslint.org/)                                        | JavaScript-, JSX- und TypeScript-Regeln      |
-| `biome`        | [Biome](https://biomejs.dev/)                                        | Linting, Formatierung und Imports            |
-| `prettier`     | [Prettier](https://prettier.io/)                                     | Formatierung                                 |
-| `typescript`   | [TypeScript](https://www.typescriptlang.org/)                        | Projektweite Typprüfung, auch für JavaScript |
-| `oxlint`       | [Oxlint](https://oxc.rs/docs/guide/usage/linter.html)                | Zusätzliche JS-/TS-Lint-Regeln               |
+project executables take precedence over central tools, then PATH. existing project configurations are used where supported; otherwise the bundled defaults apply (including PSR-12, PHPStan level 6 and Psalm level 3). different formatters can disagree, so style findings remain separate.
 
-Ohne Werkzeugauswahl laufen alle zur Sprache der Eingabe passenden Prüfungen. Mago stellt dabei drei getrennte Prüfungen bereit; insgesamt sind elf Analyseprogramme und der native PHP-Syntaxcheck angebunden.
-
-Mehrere Formatter können denselben Code unterschiedlich bewerten. Die Befunde werden deshalb getrennt ausgegeben, statt die Dateien nacheinander mit widersprüchlichen Regeln umzuschreiben.
-
-## CLI
-
-Einen vollständigen Projektordner prüft man so:
+## cli
 
 ```sh
 php src/codechecker-cli.php --root=/var/www/project .
-```
-
-Ordner und Dateien lassen sich innerhalb desselben Projekts kombinieren:
-
-```sh
-php src/codechecker-cli.php --root=/var/www/project src public/app.js
-```
-
-Benötigt man nur bestimmte Werkzeuge, gibt man deren Kennungen an:
-
-```sh
-php src/codechecker-cli.php --root=/var/www/project --tools=phpstan,psalm,eslint,typescript src
+php src/codechecker-cli.php --root=/var/www/project --tools=phpstan,psalm,eslint,typescript src public/app.js
 php src/codechecker-cli.php --root=/var/www/project --list-tools
 ```
 
-Die CLI schreibt den Bericht als JSON nach stdout. Eingabefehler erscheinen auf stderr; Optionen stehen vor den Pfaden, ein `--` beendet die Optionsauswertung.
+options precede paths; `--` ends option parsing. `--timeout=120` sets the limit per tool invocation (1–600 seconds). output is JSON: `0` means passed, `1` means findings, `2` means invalid input or an incomplete check.
 
-| Exitcode | Bedeutung                                                           |
-| -------- | ------------------------------------------------------------------- |
-| `0`      | Alle ausgewählten, anwendbaren Prüfungen erfolgreich, keine Befunde |
-| `1`      | Prüfungen abgeschlossen, mindestens ein Werkzeug meldet Befunde     |
-| `2`      | Ungültige Eingabe oder unvollständige Prüfung                       |
-
-Mit `--timeout=120` legt man das Zeitlimit je Werkzeugaufruf fest (1 bis 600 Sekunden). Es ist kein Gesamtzeitlimit; ein großes Projekt kann entsprechend länger laufen.
-
-## PHP
+## php
 
 ```php
 <?php
@@ -106,66 +60,15 @@ require __DIR__ . '/vendor/autoload.php';
 use vielhuber\codechecker\codechecker;
 
 $checker = new codechecker(root: '/var/www/project');
-$report = $checker->check(paths: ['src', 'public/app.js']);
+$report = $checker->check(paths: ['src', 'public/app.js'], tools: ['phpstan', 'eslint']);
 
 echo json_encode($report, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR);
 exit($report->exitCode());
 ```
 
-Werkzeuge lassen sich auch über ihre Kennungen auswählen:
+omit `tools` to run every applicable check. reports contain `files`, native tool `results`, `complete` and `passed`. unavailable tools, execution errors, timeouts or truncated output make a report incomplete; findings alone do not. each output stream is limited to one MiB per invocation.
 
-```php
-$report = $checker->check(
-    paths: ['src/Invoice.php'],
-    tools: ['phpstan', 'psalm']
-);
-
-$available = $checker->listTools();
-```
-
-## Ergebnisse
-
-Der Bericht enthält "root", die ausgewählten "files", die einzelnen "results" sowie "complete" und "passed". Jedes Werkzeugergebnis nennt Kennung, Status, Prüfumfang, Eingabedateien, Argumentliste, Exitcode, Laufzeit sowie die native Ausgabe auf stdout und stderr.
-
-| Status           | Bedeutung                                    |
-| ---------------- | -------------------------------------------- |
-| `passed`         | Werkzeug ohne Befunde abgeschlossen          |
-| `findings`       | Werkzeug meldet Code-, Typ- oder Stilbefunde |
-| `unavailable`    | Kein geeignetes Programm gefunden            |
-| `error`          | Ausführung oder Konfiguration fehlgeschlagen |
-| `timeout`        | Zeitlimit des Aufrufs überschritten          |
-| `not_applicable` | Eingabe enthält keine passende Sprache       |
-
-"complete" bedeutet, dass alle ausgewählten anwendbaren Prüfungen ausgeführt wurden, nicht dass der Code fehlerfrei ist. Erst "passed" verlangt zusätzlich, dass kein Werkzeug Befunde meldet; nicht ausgewählte Werkzeuge sind damit ausdrücklich nicht abgedeckt.
-
-Die Ausgaben sind je Stream und Aufruf auf ein MiB begrenzt. Wird diese Grenze überschritten, setzt codechecker "outputTruncated" und meldet den Lauf als unvollständig, statt einen gekürzten Bericht als vollständig zu behandeln.
-
-## Projektkonfiguration
-
-Vorhandene Programme in "vendor/bin" und "node_modules/.bin" haben Vorrang vor den zentral installierten Versionen; anschließend wird PATH berücksichtigt. Damit bleiben bereits etablierte Projektversionen nutzbar.
-
-Vorhandene Konfigurationen im Projektstamm werden berücksichtigt, beispielsweise "mago.toml", "rector.php", ".php-cs-fixer.dist.php", "psalm.xml", "phpstan.neon", "phpcs.xml", "eslint.config.mjs", "biome.json" und "tsconfig.json". Ohne eigene Regeln gelten die jeweiligen Werkzeugstandards bzw. die mitgelieferten Profile: PSR-12 für PHP CS Fixer und PHP_CodeSniffer, PHPStan-Level 6, Psalm-Level 3 und empfohlene ESLint-/TypeScript-Regeln.
-
-Die TypeScript-Prüfung aktiviert "allowJs", "checkJs" und "noEmit" auch bei vorhandener Konfiguration. So wird JavaScript tatsächlich mitgeprüft, ohne JavaScript-Ausgabedateien zu erzeugen; bestehende Typoptionen werden ansonsten übernommen.
-
-Formatierung und Linting beziehen sich auf die ausgewählten Dateien. Mago-Analyse, PHPStan, Psalm und TypeScript arbeiten projektweit, damit Änderungen an Schnittstellen auch bei unveränderten Aufrufern sichtbar werden; bestehende Psalm-Projektdateien behalten ihren dort definierten Analyseumfang.
-
-## Dateiumfang und Grenzen
-
-Unterstützt werden ".php", ".phtml", ".inc", ".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts" und ".tsx". Bei Ordnern werden ".git", "vendor", "node_modules", "dist", "build", "_dist", "_build", "coverage" und ".cache" nicht durchsucht; symbolische Links werden bei der Verzeichnissuche nicht verfolgt.
-
-Explizit übergebene Dateien dürfen auch in diesen Ordnern liegen, müssen aber nach Auflösung innerhalb des gewählten Projektstamms bleiben. Werkzeugkonfigurationen können zusätzliche Ausschlüsse enthalten; für Monorepos führt man die Teilprojekte mit ihren jeweiligen Projektstämmen getrennt aus.
-
-Kein Werkzeugbestand findet sämtliche Fehler. Fachliche Anforderungen, tatsächliche Benutzerabläufe, Framework-Magie und eingebetteter Code in Vue-/Svelte-/HTML-Dateien benötigen zusätzliche passende Prüfungen; erfolgreiche statische Analyse ersetzt weder Tests noch ein fachliches Review.
-
-## MCP-Server
-
-Der MCP-Server verwendet [simplemcp](https://github.com/vielhuber/simplemcp) und stellt dieselben Prüfungen wie Bibliothek und CLI bereit:
-
-- `list_tools`: verfügbare Prüfungen und aufgelöste Programme auflisten.
-- `check_code`: Ordner bzw. Dateien prüfen und den Bericht zurückgeben.
-
-Für eine lokale stdio-Verbindung wird der Projektstamm beim Start festgelegt:
+## mcp
 
 ```json
 {
@@ -173,39 +76,28 @@ Für eine lokale stdio-Verbindung wird der Projektstamm beim Start festgelegt:
         "codechecker": {
             "command": "php",
             "args": ["/opt/codechecker/src/mcp-server.php"],
-            "env": {
-                "CODECHECKER_ROOT": "/var/www/project"
-            }
+            "env": { "CODECHECKER_ROOT": "/var/www" }
         }
     }
 }
 ```
 
-Ein Aufruf kann beispielsweise so aussehen:
+- `list_tools(project: "shop")` lists checks and resolved executables.
+- `check_code(project: "shop", paths: ["src"], tools: ["phpstan"])` checks the selected project.
 
-```json
-{
-    "paths": ["src", "public/app.js"],
-    "tools": ["phpstan", "psalm", "eslint", "typescript"],
-    "timeout": 120
-}
-```
+`project` defaults to `"."`; empty `paths` selects the whole project, empty `tools` selects all checks. paths and projects cannot escape `CODECHECKER_ROOT`.
 
-Leere "paths" prüfen den gesamten Projektordner, leere "tools" wählen alle passenden Werkzeuge. Der Aufrufer kann den freigegebenen Projektstamm nicht über ein Tool-Argument erweitern; die Gesamtfrist des MCP-Clients muss zur erwarteten Laufzeit passen.
+stdio needs no token. for HTTP, copy `.env.example` to `.env`, set `CODECHECKER_ROOT` and a random `MCP_TOKEN`, and expose `src/mcp-server.php` over HTTPS. require `Authorization: Bearer <MCP_TOKEN>` and block web access to `.env`; requests without a valid token are rejected.
 
-Soll ein Server mehrere Projekte bedienen, setzt man "CODECHECKER_ROOT" auf deren gemeinsames Oberverzeichnis. Mit "project" wählt man bei `check_code` bzw. `list_tools` einen Projektordner darunter; beispielsweise prüft `{"project":"shop","paths":["src"]}` ausschließlich das Projekt "shop", ohne die Typinformationen anderer Projekte zu vermischen. Auch "project" darf die freigegebene Grenze nicht verlassen.
+## scope and safety
 
-Für HTTP kopiert man ".env.example" nach ".env" im Paketverzeichnis und setzt "CODECHECKER_ROOT" sowie einen eigenen zufälligen "MCP_TOKEN". Der Endpoint ist "src/mcp-server.php"; Anfragen benötigen `Authorization: Bearer <MCP_TOKEN>`, HTTPS und einen Webserver, der den direkten Zugriff auf ".env" sperrt. Ohne Token werden HTTP-Anfragen abgewiesen.
+supports `.php`, `.phtml`, `.inc`, `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.mts`, `.cts` and `.tsx`. directory scans skip symlinks, `.git`, `vendor`, `node_modules`, build directories, `coverage` and `.cache`. explicit files must remain inside the project root.
 
-Der stdio-Betrieb benötigt keinen Token. Die Einbindung in Charly oder einen anderen MCP-Client erfolgt separat; codechecker verändert dessen Konfiguration nicht automatisch.
+mago analysis, PHPStan, Psalm and TypeScript run project-wide even for selected files; existing Psalm configurations retain their own scope. TypeScript also checks JavaScript without emitting files. analyze monorepo packages separately and use framework-specific tools for embedded Vue, Svelte or HTML code.
 
-## Sicherheit
+no fixes or package installations run during checks. project configurations and plugins are executable code, however: path boundaries are not an operating-system sandbox. run untrusted projects in an isolated environment. static checks do not replace tests or application review.
 
-codechecker setzt keine Fix-, Write- oder Emit-Optionen und installiert während einer Prüfung keine Werkzeuge in das Zielprojekt. Diagnoseberichte bleiben lokal; die temporären Arbeitsverzeichnisse werden nach den Aufrufen entfernt.
-
-Projektkonfigurationen und Plugins sind jedoch ausführbarer PHP- bzw. JavaScript-Code. Der Projektstamm ist eine Grenze für übergebene Dateipfade, keine Betriebssystem-Sandbox: Nicht vertrauenswürdige Repositories gehören in eine isolierte Umgebung ohne Zugangsdaten oder schreibbare fremde Projekte.
-
-## Eigene Projektprüfung
+## development
 
 ```sh
 composer validate --strict
@@ -214,6 +106,4 @@ npm run format:check
 composer check
 ```
 
-Die Einzelwerkzeuge stehen in "tools/composer.json" und "package.json". Der separate Composer-Lock hält die PHP-Werkzeugversionen einschließlich ihrer Abhängigkeiten fest; die JS-Werkzeuge haben feste Versionsangaben. Updates erfolgen bewusst dort, getrennt von den Runtime-Abhängigkeiten der PHP-Bibliothek.
-
-Die CI verwendet Prettier als kanonischen Formatter und prüft Syntax, Mago-Analyse, PHPStan, Psalm, ESLint, Biome, TypeScript und Oxlint. Mit `composer check` erhält man zusätzlich sämtliche überlappenden Stil- und Refactoring-Prüfungen; unterschiedliche Formatvorstellungen bleiben dabei als Befunde sichtbar.
+CI uses the canonical prettier formatting and the syntax/static-analysis profile. `composer check` additionally runs the overlapping style and refactoring checks, which may report conflicting rules. PHP tool versions are locked separately under `tools`; JavaScript tools have exact direct versions in `package.json`.
