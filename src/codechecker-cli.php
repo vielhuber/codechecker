@@ -9,8 +9,8 @@ if (PHP_SAPI !== 'cli') {
 require_once __DIR__ . '/autoload.php';
 
 use vielhuber\codechecker\exception;
-use vielhuber\codechecker\report;
 use vielhuber\codechecker\codechecker;
+use vielhuber\codechecker\reports;
 
 try {
     $root = null;
@@ -18,7 +18,9 @@ try {
     $paths = [];
     $timeout = 120;
     $listTools = false;
+    $summary = false;
     $mode = 'project';
+    $reportId = null;
     $options = true;
     $arguments = $_SERVER['argv'] ?? [];
     $matches = [];
@@ -30,7 +32,7 @@ try {
         if ($options && $argument === '--help') {
             fwrite(
                 STDOUT,
-                "Usage: codechecker-cli.php [--root=PATH] [--tools=phpstan,eslint] [--timeout=120] [--mode=files|project] [--list-tools] [--] [PATH ...]\nExit codes: 0 passed, 1 findings, 2 incomplete or invalid input.\n"
+                "Usage: codechecker-cli.php [--root=PATH] [--tools=phpstan,eslint] [--timeout=120] [--mode=files|project] [--summary] [--report=ID] [--list-tools] [--] [PATH ...]\nExit codes: 0 passed, 1 findings, 2 incomplete or invalid input.\n"
             );
             exit(0);
         }
@@ -38,8 +40,16 @@ try {
             $listTools = true;
             continue;
         }
+        if ($options && $argument === '--summary') {
+            $summary = true;
+            continue;
+        }
         if ($options && str_starts_with($argument, '--mode=')) {
             $mode = substr($argument, 7);
+            continue;
+        }
+        if ($options && str_starts_with($argument, '--report=')) {
+            $reportId = substr($argument, 9);
             continue;
         }
         if ($options && str_starts_with($argument, '--root=')) {
@@ -60,17 +70,28 @@ try {
         $paths[] = $argument;
     }
     $checker = new codechecker(root: $root);
-    $report = $listTools
-        ? $checker->listTools()
-        : $checker->check(paths: $paths, tools: $tools, timeout: $timeout, mode: $mode);
+    $exitCode = 0;
+    if ($reportId !== null) {
+        $output = $checker->getReport($reportId);
+    }
+    if ($reportId === null && $listTools) {
+        $output = $checker->listTools();
+    }
+    if ($reportId === null && !$listTools) {
+        $report = $checker->check(paths: $paths, tools: $tools, timeout: $timeout, mode: $mode);
+        $store = new reports($report->root);
+        $compact = $store->save($report);
+        $output = $summary ? $compact : $store->read($compact['reportId']);
+        $exitCode = $report->exitCode();
+    }
     fwrite(
         STDOUT,
         json_encode(
-            $report,
+            $output,
             JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
         ) . PHP_EOL
     );
-    exit($report instanceof report ? $report->exitCode() : 0);
+    exit($exitCode);
 } catch (exception | \UnexpectedValueException | \JsonException $exception) {
     fwrite(STDERR, $exception->getMessage() . PHP_EOL);
     exit(2);

@@ -53,6 +53,12 @@ final class exception extends \InvalidArgumentException
             'File mode requires explicit source files and file-scoped tools; use project mode for whole-project analysis.'
         );
     }
+
+    /** Keep report identifiers separate from caller-controlled filesystem paths. */
+    public static function reportNotFound(): self
+    {
+        return new self('The report does not exist in this project.');
+    }
 }
 
 enum status: string
@@ -259,15 +265,16 @@ final readonly class codechecker
     }
 
     /**
-     * Expose explicit file checks to MCP while retaining PHP API defaults.
+     * Return a compact, persistent report without exposing broad defaults to MCP callers.
      *
      * @param list<string> $paths
      * @param list<string> $tools
+     * @return array<string, mixed>
      */
     #[
         McpTool(
             name: 'check_code',
-            description: 'Read-only checks. File mode requires explicit files and file-scoped tools. Only explicitly requested project mode permits directories, empty selections or project-wide analysis. No fixes or installations.'
+            description: 'Read-only checks with persistent full reports and compact findings. File mode requires explicit files and file-scoped tools. Only explicitly requested project mode permits directories, empty selections or project-wide analysis. No fixes or installations.'
         )
     ]
     public function checkCode(
@@ -303,8 +310,9 @@ final readonly class codechecker
         ]
         string $project = '.',
         #[Schema(enum: ['files', 'project'])] string $mode = 'files'
-    ): report {
-        return $this->check(paths: $paths, tools: $tools, timeout: $timeout, project: $project, mode: $mode);
+    ): array {
+        $report = $this->check(paths: $paths, tools: $tools, timeout: $timeout, project: $project, mode: $mode);
+        return new reports($report->root)->save($report);
     }
 
     /**
@@ -392,5 +400,32 @@ final readonly class codechecker
             }
         }
         return new report(root: $workspace->root, files: $selected, results: $results);
+    }
+
+    /** Return complete diagnostics only from the selected project's private report store. */
+    #[
+        McpTool(
+            name: 'get_report',
+            description: 'Read a complete saved report in the selected project, optionally limited to one tool. Report IDs never accept filesystem paths.'
+        )
+    ]
+    public function getReport(
+        #[Schema(pattern: '^[a-f0-9]{32}$')] string $reportId,
+        #[Schema(description: 'Project directory inside CODECHECKER_ROOT.')] string $project = '.',
+        #[Schema(description: 'Optional tool name; empty returns all tools.')] string $tool = ''
+    ): array {
+        if ($tool !== '' && tool::tryFrom($tool) === null) {
+            throw exception::invalidOptions();
+        }
+        $report = new reports($this->workspace->resolve($project))->read($reportId);
+        if ($tool !== '') {
+            foreach (['results', 'findings', 'resolvedFindings'] as $field) {
+                $report[$field] = array_values(
+                    array_filter($report[$field], static fn(array $entry): bool => $entry['tool'] === $tool)
+                );
+            }
+            unset($report['summary']);
+        }
+        return $report;
     }
 }

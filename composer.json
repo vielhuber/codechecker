@@ -12,7 +12,8 @@
         "files": [
             "src/codechecker.php",
             "src/workspace.php",
-            "src/runner.php"
+            "src/runner.php",
+            "src/reports.php"
         ]
     },
     "bin": [
