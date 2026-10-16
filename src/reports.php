@@ -113,10 +113,14 @@ final readonly class reports
             $findings = [];
             $occurrences = [];
             $structured = [];
-            foreach ($data['results'] as &$result) {
+            foreach ($data['results'] as $resultIndex => $result) {
                 if ($result['outputTruncated']) {
                     foreach (['output' => 'outputFile', 'errorOutput' => 'errorOutputFile'] as $stream => $path) {
-                        $content = file_get_contents($result[$path]);
+                        $outputPath = $result[$path];
+                        if ($outputPath === null) {
+                            throw exception::outputStorageFailed();
+                        }
+                        $content = file_get_contents($outputPath);
                         if ($content === false) {
                             throw exception::outputStorageFailed();
                         }
@@ -154,6 +158,7 @@ final readonly class reports
                 }
                 $result['version'] = $binary !== null ? $versions[$binary] : null;
                 $result['normalized'] = true;
+                $data['results'][$resultIndex] = $result;
                 if ($result['status'] !== 'not_applicable' && $result['version'] === null) {
                     $comparable = false;
                 }
@@ -164,16 +169,18 @@ final readonly class reports
                 $decoded = json_decode($result['output'], true);
                 $diagnostics = [];
                 if ($result['tool'] === 'eslint' && is_array($decoded) && array_is_list($decoded)) {
-                    /** @var list<array{filePath: string, messages?: list<array<string, mixed>>}> $decoded */
-                    foreach ($decoded as $file) {
+                    /** @var list<array{filePath: string, messages?: list<array<string, mixed>>}> $eslintFiles */
+                    $eslintFiles = $decoded;
+                    foreach ($eslintFiles as $file) {
                         foreach ($file['messages'] ?? [] as $message) {
                             $diagnostics[] = ['file' => $file['filePath']] + $message;
                         }
                     }
                 }
                 if (in_array($result['tool'], ['phpcs', 'phpstan'], true) && is_array($decoded)) {
-                    /** @var array{files?: array<string, array{messages?: list<array<string, mixed>>}>} $decoded */
-                    foreach ($decoded['files'] ?? [] as $file => $details) {
+                    /** @var array<string, array{messages?: list<array<string, mixed>>}> $phpFiles */
+                    $phpFiles = $decoded['files'] ?? [];
+                    foreach ($phpFiles as $file => $details) {
                         foreach ($details['messages'] ?? [] as $message) {
                             $diagnostics[] = ['file' => $file] + $message;
                         }
@@ -183,15 +190,15 @@ final readonly class reports
                     in_array($result['tool'], ['mago-lint', 'mago-analyze', 'biome', 'oxlint'], true) &&
                     is_array($decoded)
                 ) {
-                    /** @var array{issues?: list<array<string, mixed>>, diagnostics?: list<array<string, mixed>>} $decoded */
+                    /** @var list<array<string, mixed>> $diagnostics */
                     $diagnostics = $decoded['issues'] ?? ($decoded['diagnostics'] ?? []);
                 }
                 if ($result['tool'] === 'psalm' && is_array($decoded) && array_is_list($decoded)) {
-                    /** @var list<array<string, mixed>> $decoded */
                     $diagnostics = $decoded;
                 }
                 $structured[$result['tool']] = ($structured[$result['tool']] ?? true) && $diagnostics !== [];
                 $result['normalized'] = $diagnostics !== [];
+                $data['results'][$resultIndex] = $result;
                 if ($diagnostics === []) {
                     $diagnostics = [
                         [
@@ -201,8 +208,9 @@ final readonly class reports
                         ]
                     ];
                 }
-                foreach ($diagnostics as $diagnostic) {
+                foreach ($diagnostics as $nativeDiagnostic) {
                     /** @var array{annotations?: list<array{span?: array{file_id?: array{path?: string}, start?: array{line?: int}}}>, file?: string, file_path?: string, filename?: string, location?: array{path?: string, start?: array{line?: int}}, line?: int, line_from?: int, labels?: list<array{span?: array{line?: int}}>, ruleId?: ?string, source?: string, identifier?: string, code?: string, category?: string, type?: string, message?: mixed, level?: string, severity?: int|string, digest?: string} $diagnostic */
+                    $diagnostic = $nativeDiagnostic;
                     $annotation = $diagnostic['annotations'][0]['span'] ?? [];
                     $file =
                         $diagnostic['file'] ??
@@ -220,7 +228,9 @@ final readonly class reports
                             ($diagnostic['identifier'] ??
                                 ($diagnostic['code'] ??
                                     ($diagnostic['category'] ?? ($diagnostic['type'] ?? $result['tool'])))));
-                    $message = $diagnostic['message'] ?? '';
+                    $message = is_string($diagnostic['message'] ?? '')
+                        ? $diagnostic['message'] ?? ''
+                        : json_encode($diagnostic['message'], JSON_THROW_ON_ERROR);
                     $severity =
                         $result['tool'] === 'phpcs'
                             ? $diagnostic['type'] ?? 'unknown'
@@ -233,11 +243,8 @@ final readonly class reports
                             default => 'unknown'
                         }
                         : strtolower($severity);
-                    if (!is_string($message)) {
-                        $message = json_encode($message, JSON_THROW_ON_ERROR);
-                    }
                     $source = '';
-                    if (is_string($file) && $file !== '') {
+                    if ($file !== '') {
                         $resolved = realpath(str_starts_with($file, '/') ? $file : $this->root . '/' . $file);
                         if (
                             $resolved !== false &&
@@ -282,7 +289,6 @@ final readonly class reports
                     ];
                 }
             }
-            unset($result);
             $toolNames = array_values(array_unique(array_column($data['results'], 'tool')));
             sort($toolNames);
             ksort($versions);
@@ -304,6 +310,7 @@ final readonly class reports
             $latest = $this->directory . '/latest-' . $context . '.json';
             $previous = null;
             if ($comparable && is_file($latest)) {
+                /** @var string|null $previousReportId */
                 $previousReportId = json_decode((string) file_get_contents($latest), true, flags: JSON_THROW_ON_ERROR);
                 if (!is_string($previousReportId)) {
                     throw exception::reportNotFound();
@@ -313,7 +320,7 @@ final readonly class reports
             /** @var list<array{id: string, tool: string, precise: bool, state: string}> $storedFindings */
             $storedFindings = $previous['findings'] ?? [];
             $previousFindings = array_column($storedFindings, null, 'id');
-            foreach ($findings as &$finding) {
+            foreach ($findings as $findingIndex => $finding) {
                 $finding['state'] = 'unknown';
                 if (
                     $previous !== null &&
@@ -325,9 +332,9 @@ final readonly class reports
                 if ($previous !== null && !isset($previousFindings[$finding['id']]) && $finding['precise']) {
                     $finding['state'] = 'new';
                 }
+                $findings[$findingIndex] = $finding;
                 unset($previousFindings[$finding['id']]);
             }
-            unset($finding);
             $resolved = [];
             foreach ($previousFindings as $finding) {
                 $statuses = array_column(

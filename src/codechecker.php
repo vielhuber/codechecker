@@ -270,6 +270,7 @@ final readonly class codechecker
      * @param list<string> $paths
      * @param list<string> $tools
      * @return array{reportId: string, root: string, files: list<string>, complete: bool, passed: bool, results: list<array<string, mixed>>, comparison: array<string, mixed>, findings: list<array<string, mixed>>, omittedFindings: int}
+     * @api
      */
     #[
         McpTool(
