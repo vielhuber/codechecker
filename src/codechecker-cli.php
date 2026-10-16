@@ -10,7 +10,6 @@ require_once __DIR__ . '/autoload.php';
 
 use vielhuber\codechecker\exception;
 use vielhuber\codechecker\codechecker;
-use vielhuber\codechecker\reports;
 
 try {
     $root = null;
@@ -71,18 +70,17 @@ try {
     }
     $checker = new codechecker(root: $root);
     $exitCode = 0;
-    if ($reportId !== null) {
-        $output = $checker->getReport($reportId);
-    }
-    if ($reportId === null && $listTools) {
-        $output = $checker->listTools();
-    }
-    if ($reportId === null && !$listTools) {
-        $report = $checker->check(paths: $paths, tools: $tools, timeout: $timeout, mode: $mode);
-        $store = new reports($report->root);
-        $compact = $store->save($report);
-        $output = $summary ? $compact : $store->read($compact['reportId']);
-        $exitCode = $report->exitCode();
+    switch (true) {
+        case $reportId !== null:
+            $output = $checker->getReport($reportId);
+            break;
+        case $listTools:
+            $output = $checker->listTools();
+            break;
+        default:
+            $compact = $checker->checkCode(paths: $paths, tools: $tools, timeout: $timeout, mode: $mode);
+            $output = $summary ? $compact : $checker->getReport($compact['reportId']);
+            $exitCode = !$compact['complete'] ? 2 : ($compact['passed'] ? 0 : 1);
     }
     fwrite(
         STDOUT,

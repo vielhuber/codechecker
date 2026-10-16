@@ -140,7 +140,7 @@ final readonly class result implements \JsonSerializable
     /**
      * Keep the transport representation explicit for CLI and MCP consumers.
      *
-     * @return array<string, mixed>
+     * @return array{tool: string, status: string, scope: string, files: list<string>, command: list<string>, exitCode: ?int, output: string, errorOutput: string, seconds: float, outputTruncated: bool, outputFile: ?string, errorOutputFile: ?string}
      */
     #[\Override]
     public function jsonSerialize(): array
@@ -210,7 +210,7 @@ final readonly class report implements \JsonSerializable
     /**
      * Expose completion separately from the absence of diagnostics.
      *
-     * @return array<string, mixed>
+     * @return array{root: string, files: list<string>, results: list<result>, complete: bool, passed: bool}
      */
     #[\Override]
     public function jsonSerialize(): array
@@ -269,7 +269,7 @@ final readonly class codechecker
      *
      * @param list<string> $paths
      * @param list<string> $tools
-     * @return array<string, mixed>
+     * @return array{reportId: string, root: string, files: list<string>, complete: bool, passed: bool, results: list<array<string, mixed>>, comparison: array<string, mixed>, findings: list<array<string, mixed>>, omittedFindings: int}
      */
     #[
         McpTool(
@@ -361,7 +361,7 @@ final readonly class codechecker
         if ($selected === []) {
             throw exception::emptySelection();
         }
-        $projectFiles = null;
+        $projectFiles = [];
         $runner = new runner();
         $results = [];
         foreach (array_unique($tools, SORT_REGULAR) as $tool) {
@@ -379,7 +379,7 @@ final readonly class codechecker
                 $results[] = new result(tool: $tool, status: status::NotApplicable, scope: $scope);
                 continue;
             }
-            if ($tool->projectWide() && $projectFiles === null) {
+            if ($tool->projectWide() && $projectFiles === []) {
                 $projectFiles = array_values(array_unique([...$workspace->files(), ...$selected]));
             }
             $files = array_values(
@@ -402,7 +402,11 @@ final readonly class codechecker
         return new report(root: $workspace->root, files: $selected, results: $results);
     }
 
-    /** Return complete diagnostics only from the selected project's private report store. */
+    /**
+     * Return complete diagnostics only from the selected project's private report store.
+     *
+     * @return array<string, mixed>
+     */
     #[
         McpTool(
             name: 'get_report',
@@ -420,8 +424,10 @@ final readonly class codechecker
         $report = new reports($this->workspace->resolve($project))->read($reportId);
         if ($tool !== '') {
             foreach (['results', 'findings', 'resolvedFindings'] as $field) {
+                /** @var list<array<string, mixed>> $entries */
+                $entries = $report[$field];
                 $report[$field] = array_values(
-                    array_filter($report[$field], static fn(array $entry): bool => $entry['tool'] === $tool)
+                    array_filter($entries, static fn(array $entry): bool => $entry['tool'] === $tool)
                 );
             }
             unset($report['summary']);

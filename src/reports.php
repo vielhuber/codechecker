@@ -37,7 +37,7 @@ final readonly class reports
     /**
      * Preserve full outputs while comparing only equivalent, successfully completed checks.
      *
-     * @return array<string, mixed>
+     * @return array{reportId: string, root: string, files: list<string>, complete: bool, passed: bool, results: list<array<string, mixed>>, comparison: array<string, mixed>, findings: list<array<string, mixed>>, omittedFindings: int}
      */
     public function save(report $report): array
     {
@@ -47,7 +47,8 @@ final readonly class reports
         ) {
             throw exception::outputStorageFailed();
         }
-        if ((fileperms($this->directory) & 0o077) !== 0) {
+        $permissions = fileperms($this->directory);
+        if ($permissions === false || ($permissions & 0o077) !== 0) {
             throw exception::outputStorageFailed();
         }
         if (is_link($this->directory . '/.lock')) {
@@ -61,7 +62,11 @@ final readonly class reports
             throw exception::outputStorageFailed();
         }
         try {
-            $data = json_decode(json_encode($report, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
+            $data = $report->jsonSerialize();
+            $data['results'] = array_map(
+                static fn(result $result): array => $result->jsonSerialize(),
+                $report->results
+            );
             $sources = [];
             $sourceLines = [];
             $configurations = [];
@@ -155,9 +160,11 @@ final readonly class reports
                 if ($result['status'] !== 'findings') {
                     continue;
                 }
+                /** @var array<string, mixed>|list<array<string, mixed>>|null $decoded */
                 $decoded = json_decode($result['output'], true);
                 $diagnostics = [];
                 if ($result['tool'] === 'eslint' && is_array($decoded) && array_is_list($decoded)) {
+                    /** @var list<array{filePath: string, messages?: list<array<string, mixed>>}> $decoded */
                     foreach ($decoded as $file) {
                         foreach ($file['messages'] ?? [] as $message) {
                             $diagnostics[] = ['file' => $file['filePath']] + $message;
@@ -165,6 +172,7 @@ final readonly class reports
                     }
                 }
                 if (in_array($result['tool'], ['phpcs', 'phpstan'], true) && is_array($decoded)) {
+                    /** @var array{files?: array<string, array{messages?: list<array<string, mixed>>}>} $decoded */
                     foreach ($decoded['files'] ?? [] as $file => $details) {
                         foreach ($details['messages'] ?? [] as $message) {
                             $diagnostics[] = ['file' => $file] + $message;
@@ -175,9 +183,11 @@ final readonly class reports
                     in_array($result['tool'], ['mago-lint', 'mago-analyze', 'biome', 'oxlint'], true) &&
                     is_array($decoded)
                 ) {
+                    /** @var array{issues?: list<array<string, mixed>>, diagnostics?: list<array<string, mixed>>} $decoded */
                     $diagnostics = $decoded['issues'] ?? ($decoded['diagnostics'] ?? []);
                 }
                 if ($result['tool'] === 'psalm' && is_array($decoded) && array_is_list($decoded)) {
+                    /** @var list<array<string, mixed>> $decoded */
                     $diagnostics = $decoded;
                 }
                 $structured[$result['tool']] = ($structured[$result['tool']] ?? true) && $diagnostics !== [];
@@ -192,6 +202,7 @@ final readonly class reports
                     ];
                 }
                 foreach ($diagnostics as $diagnostic) {
+                    /** @var array{annotations?: list<array{span?: array{file_id?: array{path?: string}, start?: array{line?: int}}}>, file?: string, file_path?: string, filename?: string, location?: array{path?: string, start?: array{line?: int}}, line?: int, line_from?: int, labels?: list<array{span?: array{line?: int}}>, ruleId?: ?string, source?: string, identifier?: string, code?: string, category?: string, type?: string, message?: mixed, level?: string, severity?: int|string, digest?: string} $diagnostic */
                     $annotation = $diagnostic['annotations'][0]['span'] ?? [];
                     $file =
                         $diagnostic['file'] ??
@@ -266,7 +277,8 @@ final readonly class reports
                         'line' => $line,
                         'message' => $message,
                         'severity' => $severity,
-                        'precise' => $precise
+                        'precise' => $precise,
+                        'state' => 'unknown'
                     ];
                 }
             }
@@ -292,11 +304,15 @@ final readonly class reports
             $latest = $this->directory . '/latest-' . $context . '.json';
             $previous = null;
             if ($comparable && is_file($latest)) {
-                $previous = $this->read(
-                    json_decode((string) file_get_contents($latest), true, flags: JSON_THROW_ON_ERROR)
-                );
+                $previousReportId = json_decode((string) file_get_contents($latest), true, flags: JSON_THROW_ON_ERROR);
+                if (!is_string($previousReportId)) {
+                    throw exception::reportNotFound();
+                }
+                $previous = $this->read($previousReportId);
             }
-            $previousFindings = array_column($previous['findings'] ?? [], null, 'id');
+            /** @var list<array{id: string, tool: string, precise: bool, state: string}> $storedFindings */
+            $storedFindings = $previous['findings'] ?? [];
+            $previousFindings = array_column($storedFindings, null, 'id');
             foreach ($findings as &$finding) {
                 $finding['state'] = 'unknown';
                 if (
@@ -361,10 +377,10 @@ final readonly class reports
                     'unknown' => $states['unknown'] ?? 0,
                     'resolved' => count($resolved)
                 ],
-                'findings' => array_map(
-                    fn(array $finding): array => [...$finding, 'message' => $this->preview($finding['message'], 500)],
-                    array_slice($visible, 0, 20)
-                ),
+                'findings' => array_map(function (array $finding): array {
+                    $finding['message'] = $this->preview($finding['message'], 500);
+                    return $finding;
+                }, array_slice($visible, 0, 20)),
                 'omittedFindings' => max(0, count($visible) - 20)
             ];
             $data += [
@@ -406,6 +422,7 @@ final readonly class reports
         if (is_link($this->directory) || is_link($file) || !is_file($file)) {
             throw exception::reportNotFound();
         }
+        /** @var array<string, mixed>|null $data */
         $data = json_decode((string) file_get_contents($file), true, flags: JSON_THROW_ON_ERROR);
         if (!is_array($data) || ($data['root'] ?? null) !== $this->root || ($data['reportId'] ?? null) !== $reportId) {
             throw exception::reportNotFound();
@@ -416,6 +433,7 @@ final readonly class reports
     /** Keep transport previews bounded without splitting a UTF-8 character. */
     private function preview(string $text, int $limit): string
     {
+        $matches = [];
         if (preg_match('/^.{0,' . $limit . '}/us', $text, $matches) !== 1) {
             throw exception::outputStorageFailed();
         }
