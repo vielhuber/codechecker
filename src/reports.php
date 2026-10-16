@@ -113,7 +113,8 @@ final readonly class reports
             $findings = [];
             $occurrences = [];
             $structured = [];
-            foreach ($data['results'] as $resultIndex => $result) {
+            $results = [];
+            foreach ($data['results'] as $result) {
                 if ($result['outputTruncated']) {
                     foreach (['output' => 'outputFile', 'errorOutput' => 'errorOutputFile'] as $stream => $path) {
                         $outputPath = $result[$path];
@@ -158,11 +159,11 @@ final readonly class reports
                 }
                 $result['version'] = $binary !== null ? $versions[$binary] : null;
                 $result['normalized'] = true;
-                $data['results'][$resultIndex] = $result;
                 if ($result['status'] !== 'not_applicable' && $result['version'] === null) {
                     $comparable = false;
                 }
                 if ($result['status'] !== 'findings') {
+                    $results[] = $result;
                     continue;
                 }
                 /** @var array<string, mixed>|list<array<string, mixed>>|null $decoded */
@@ -198,7 +199,7 @@ final readonly class reports
                 }
                 $structured[$result['tool']] = ($structured[$result['tool']] ?? true) && $diagnostics !== [];
                 $result['normalized'] = $diagnostics !== [];
-                $data['results'][$resultIndex] = $result;
+                $results[] = $result;
                 if ($diagnostics === []) {
                     $diagnostics = [
                         [
@@ -209,7 +210,7 @@ final readonly class reports
                     ];
                 }
                 foreach ($diagnostics as $nativeDiagnostic) {
-                    /** @var array{annotations?: list<array{span?: array{file_id?: array{path?: string}, start?: array{line?: int}}}>, file?: string, file_path?: string, filename?: string, location?: array{path?: string, start?: array{line?: int}}, line?: int, line_from?: int, labels?: list<array{span?: array{line?: int}}>, ruleId?: ?string, source?: string, identifier?: string, code?: string, category?: string, type?: string, message?: mixed, level?: string, severity?: int|string, digest?: string} $diagnostic */
+                    /** @var array{annotations?: list<array{span?: array{file_id?: array{path?: string}, start?: array{line?: int}}}>, file?: string, file_path?: string, filename?: string, location?: array{path?: string, start?: array{line?: int}}, line?: int, line_from?: int, labels?: list<array{span?: array{line?: int}}>, ruleId?: ?string, source?: string, identifier?: string, code?: string, category?: string, type?: string, message?: null|bool|int|float|string|array<array-key, mixed>, level?: string, severity?: int|string, digest?: string} $diagnostic */
                     $diagnostic = $nativeDiagnostic;
                     $annotation = $diagnostic['annotations'][0]['span'] ?? [];
                     $file =
@@ -228,9 +229,10 @@ final readonly class reports
                             ($diagnostic['identifier'] ??
                                 ($diagnostic['code'] ??
                                     ($diagnostic['category'] ?? ($diagnostic['type'] ?? $result['tool'])))));
-                    $message = is_string($diagnostic['message'] ?? '')
-                        ? $diagnostic['message'] ?? ''
-                        : json_encode($diagnostic['message'], JSON_THROW_ON_ERROR);
+                    $nativeMessage = $diagnostic['message'] ?? '';
+                    $message = is_string($nativeMessage)
+                        ? $nativeMessage
+                        : json_encode($nativeMessage, JSON_THROW_ON_ERROR);
                     $severity =
                         $result['tool'] === 'phpcs'
                             ? $diagnostic['type'] ?? 'unknown'
@@ -289,6 +291,7 @@ final readonly class reports
                     ];
                 }
             }
+            $data['results'] = $results;
             $toolNames = array_values(array_unique(array_column($data['results'], 'tool')));
             sort($toolNames);
             ksort($versions);
