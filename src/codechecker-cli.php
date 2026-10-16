@@ -18,6 +18,7 @@ try {
     $paths = [];
     $timeout = 120;
     $listTools = false;
+    $mode = 'project';
     $options = true;
     $arguments = $_SERVER['argv'] ?? [];
     $matches = [];
@@ -29,12 +30,16 @@ try {
         if ($options && $argument === '--help') {
             fwrite(
                 STDOUT,
-                "Usage: codechecker-cli.php [--root=PATH] [--tools=phpstan,eslint] [--timeout=120] [--list-tools] [--] [PATH ...]\nExit codes: 0 passed, 1 findings, 2 incomplete or invalid input.\n"
+                "Usage: codechecker-cli.php [--root=PATH] [--tools=phpstan,eslint] [--timeout=120] [--mode=files|project] [--list-tools] [--] [PATH ...]\nExit codes: 0 passed, 1 findings, 2 incomplete or invalid input.\n"
             );
             exit(0);
         }
         if ($options && $argument === '--list-tools') {
             $listTools = true;
+            continue;
+        }
+        if ($options && str_starts_with($argument, '--mode=')) {
+            $mode = substr($argument, 7);
             continue;
         }
         if ($options && str_starts_with($argument, '--root=')) {
@@ -55,7 +60,9 @@ try {
         $paths[] = $argument;
     }
     $checker = new codechecker(root: $root);
-    $report = $listTools ? $checker->listTools() : $checker->check(paths: $paths, tools: $tools, timeout: $timeout);
+    $report = $listTools
+        ? $checker->listTools()
+        : $checker->check(paths: $paths, tools: $tools, timeout: $timeout, mode: $mode);
     fwrite(
         STDOUT,
         json_encode(

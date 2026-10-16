@@ -38,10 +38,11 @@ proj bins/cfg first, central bins/defaults next, system bins last. defaults: psr
 ```sh
 php src/codechecker-cli.php --root=/var/www/proj .
 php src/codechecker-cli.php --root=/var/www/proj --tools=php-syntax,eslint src/demo.php public/demo.js
+php src/codechecker-cli.php --root=/var/www/proj --mode=files --tools=php-syntax src/demo.php
 php src/codechecker-cli.php --root=/var/www/proj --list-tools
 ```
 
-json; exit: `0` ok, `1` findings, `2` incomplete/invalid. timeout: 120s/tool (1-600). opts before paths; `--` ends opts.
+json; exit: `0` ok, `1` findings, `2` incomplete/invalid. timeout: 120s/tool (1-600). opts before paths; `--` ends opts. cli defaults to project mode.
 
 ## php
 
@@ -58,7 +59,7 @@ $report = (new \vielhuber\codechecker\codechecker(root: '/var/www/proj'))->check
 echo json_encode($report);
 ```
 
-report: `files`, `results`, `complete` ≠ `passed`. errors/timeouts/missing bins → incomplete. preview: 1 mib/stream; full logs via `outputFile`/`errorOutputFile` if cut. host fs access required. logs > 24 h deleted on next proj check.
+report: `files`, `results`, `complete` ≠ `passed`. errors/timeouts/missing bins → incomplete. preview: 1 mib/stream; full logs via `outputFile`/`errorOutputFile` if cut. host fs access required. logs > 24 h deleted on next proj check. php `check()` keeps its project-mode defaults and raw report contract; `mode: 'files'` enforces explicit files + file-scoped tools.
 
 ## mcp
 
@@ -76,7 +77,8 @@ report: `files`, `results`, `complete` ≠ `passed`. errors/timeouts/missing bin
 
 - `list_tools(project: "shop")`: bins/checks.
 - `check_code(project: "shop", paths: ["src/demo.php"], tools: ["php-syntax"])`: run.
+- `check_code(project: "shop", mode: "project", tools: ["phpstan"])`: explicitly requested proj analysis.
 
-proj default: `"."`. empty paths: whole proj; empty tools: all checks. paths stay inside `CODECHECKER_ROOT`.
+proj default: `"."`. mcp defaults to `mode: "files"`: non-empty paths/tools, files only, no project-wide tools. `mode: "project"` permits dirs, empty paths for the whole proj, empty tools for all checks. paths stay inside `CODECHECKER_ROOT`. whole-proj callers must select `mode: "project"`; php/cli defaults stay unchanged.
 
 stdio: no token. http: copy `.env.example` → `.env`, set `CODECHECKER_ROOT` + random `MCP_TOKEN`; serve via https with `Authorization: Bearer <MCP_TOKEN>`. deny web access to `.env`. trusted cfg/plugins only; root bound ≠ sandbox.

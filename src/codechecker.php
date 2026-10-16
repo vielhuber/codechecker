@@ -35,13 +35,23 @@ final class exception extends \InvalidArgumentException
     /** Reject invalid execution settings before starting subprocesses. */
     public static function invalidOptions(): self
     {
-        return new self('Timeout must be between 1 and 600 seconds and every selected tool must be supported.');
+        return new self(
+            'Timeout must be between 1 and 600 seconds, tools must be supported and mode must be files or project.'
+        );
     }
 
     /** Prevent reporting success when native diagnostics could not be retained. */
     public static function outputStorageFailed(): self
     {
         return new self('Could not preserve the complete analyzer output.');
+    }
+
+    /** Reject broad checks before discovering or executing project sources. */
+    public static function invalidFileMode(): self
+    {
+        return new self(
+            'File mode requires explicit source files and file-scoped tools; use project mode for whole-project analysis.'
+        );
     }
 }
 
@@ -249,7 +259,7 @@ final readonly class codechecker
     }
 
     /**
-     * Inspect selected sources while keeping type analysis project-wide.
+     * Expose explicit file checks to MCP while retaining PHP API defaults.
      *
      * @param list<string> $paths
      * @param list<string> $tools
@@ -257,10 +267,10 @@ final readonly class codechecker
     #[
         McpTool(
             name: 'check_code',
-            description: 'Read-only PHP, JavaScript and TypeScript checks. Empty paths checks the whole project; empty tools selects all checks. Type analysis remains project-wide. No fixes or installations.'
+            description: 'Read-only checks. File mode requires explicit files and file-scoped tools. Only explicitly requested project mode permits directories, empty selections or project-wide analysis. No fixes or installations.'
         )
     ]
-    public function check(
+    public function checkCode(
         #[Schema(type: 'array', items: ['type' => 'string', 'minLength' => 1])] array $paths = [],
         #[
             Schema(
@@ -291,10 +301,33 @@ final readonly class codechecker
         #[
             Schema(description: 'Project directory inside CODECHECKER_ROOT; paths are relative to this project.')
         ]
-        string $project = '.'
+        string $project = '.',
+        #[Schema(enum: ['files', 'project'])] string $mode = 'files'
+    ): report {
+        return $this->check(paths: $paths, tools: $tools, timeout: $timeout, project: $project, mode: $mode);
+    }
+
+    /**
+     * Preserve PHP API defaults while allowing callers to enforce a narrow execution mode.
+     *
+     * @param list<string> $paths
+     * @param list<string> $tools
+     */
+    public function check(
+        array $paths = [],
+        array $tools = [],
+        int $timeout = 120,
+        string $project = '.',
+        string $mode = 'project'
     ): report {
         if ($timeout < 1 || $timeout > 600) {
             throw exception::invalidOptions();
+        }
+        if (!in_array($mode, ['files', 'project'], true)) {
+            throw exception::invalidOptions();
+        }
+        if ($mode === 'files' && ($paths === [] || $tools === [])) {
+            throw exception::invalidFileMode();
         }
         $tools =
             $tools === []
@@ -304,11 +337,23 @@ final readonly class codechecker
                     $tools
                 );
         $workspace = new workspace($this->workspace->resolve($project));
+        if ($mode === 'files') {
+            foreach ($paths as $path) {
+                if (!is_file($workspace->resolve($path))) {
+                    throw exception::invalidFileMode();
+                }
+            }
+            foreach ($tools as $tool) {
+                if ($tool->projectWide()) {
+                    throw exception::invalidFileMode();
+                }
+            }
+        }
         $selected = $workspace->files(...$paths);
         if ($selected === []) {
             throw exception::emptySelection();
         }
-        $projectFiles = array_values(array_unique([...$workspace->files(), ...$selected]));
+        $projectFiles = null;
         $runner = new runner();
         $results = [];
         foreach (array_unique($tools, SORT_REGULAR) as $tool) {
@@ -325,6 +370,9 @@ final readonly class codechecker
             if ($trigger === []) {
                 $results[] = new result(tool: $tool, status: status::NotApplicable, scope: $scope);
                 continue;
+            }
+            if ($tool->projectWide() && $projectFiles === null) {
+                $projectFiles = array_values(array_unique([...$workspace->files(), ...$selected]));
             }
             $files = array_values(
                 array_filter(
