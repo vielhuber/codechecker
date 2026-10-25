@@ -242,12 +242,10 @@ final readonly class codechecker
      *
      * @return list<array{name: string, language: string, scope: string, executable: ?string}>
      */
-    #[
-        McpTool(
-            name: 'list_tools',
-            description: 'List supported checks and their installed executables. No installation.'
-        )
-    ]
+    #[McpTool(
+        name: 'list_tools',
+        description: 'List supported checks and their installed executables. No installation.'
+    )]
     public function listTools(
         #[Schema(description: 'Project directory inside CODECHECKER_ROOT.')] string $project = '.'
     ): array {
@@ -272,43 +270,37 @@ final readonly class codechecker
      * @return array{reportId: string, root: string, files: list<string>, complete: bool, passed: bool, results: list<array<string, mixed>>, comparison: array<string, mixed>, findings: list<array<string, mixed>>, omittedFindings: int}
      * @api
      */
-    #[
-        McpTool(
-            name: 'check_code',
-            description: 'Read-only checks with persistent full reports and compact findings. File mode requires explicit files and file-scoped tools. Only explicitly requested project mode permits directories, empty selections or project-wide analysis. No fixes or installations.'
-        )
-    ]
+    #[McpTool(
+        name: 'check_code',
+        description: 'Read-only checks with persistent full reports and compact findings. File mode requires explicit files and file-scoped tools. Only explicitly requested project mode permits directories, empty selections or project-wide analysis. No fixes or installations.'
+    )]
     public function checkCode(
         #[Schema(type: 'array', items: ['type' => 'string', 'minLength' => 1])] array $paths = [],
-        #[
-            Schema(
-                type: 'array',
-                items: [
-                    'type' => 'string',
-                    'enum' => [
-                        'php-syntax',
-                        'mago-format',
-                        'mago-lint',
-                        'mago-analyze',
-                        'rector',
-                        'php-cs-fixer',
-                        'psalm',
-                        'phpstan',
-                        'phpcs',
-                        'eslint',
-                        'biome',
-                        'prettier',
-                        'typescript',
-                        'oxlint'
-                    ]
+        #[Schema(
+            type: 'array',
+            items: [
+                'type' => 'string',
+                'enum' => [
+                    'php-syntax',
+                    'mago-format',
+                    'mago-lint',
+                    'mago-analyze',
+                    'rector',
+                    'php-cs-fixer',
+                    'psalm',
+                    'phpstan',
+                    'phpcs',
+                    'eslint',
+                    'biome',
+                    'prettier',
+                    'typescript',
+                    'oxlint'
                 ]
-            )
-        ]
+            ]
+        )]
         array $tools = [],
         #[Schema(type: 'integer', minimum: 1, maximum: 600)] int $timeout = 120,
-        #[
-            Schema(description: 'Project directory inside CODECHECKER_ROOT; paths are relative to this project.')
-        ]
+        #[Schema(description: 'Project directory inside CODECHECKER_ROOT; paths are relative to this project.')]
         string $project = '.',
         #[Schema(enum: ['files', 'project'])] string $mode = 'files'
     ): array {
@@ -408,12 +400,10 @@ final readonly class codechecker
      *
      * @return array<string, mixed>
      */
-    #[
-        McpTool(
-            name: 'get_report',
-            description: 'Read a complete saved report in the selected project, optionally limited to one tool. Report IDs never accept filesystem paths.'
-        )
-    ]
+    #[McpTool(
+        name: 'get_report',
+        description: 'Read a complete saved report in the selected project, optionally limited to one tool. Report IDs never accept filesystem paths.'
+    )]
     public function getReport(
         #[Schema(pattern: '^[a-f0-9]{32}$')] string $reportId,
         #[Schema(description: 'Project directory inside CODECHECKER_ROOT.')] string $project = '.',
