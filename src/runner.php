@@ -121,6 +121,7 @@ final class runner
                 tool::Biome => [
                     'check',
                     '--skip=style/useConst',
+                    '--formatter-enabled=false',
                     '--reporter=json',
                     '--max-diagnostics=none',
                     '--error-on-warnings'
