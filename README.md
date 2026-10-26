@@ -33,6 +33,8 @@ once centrally, not per proj. skip npm for php-only. lib: `composer require viel
 
 proj bins/cfg first, central bins/defaults next, system bins last. defaults: psr-12, phpstan lvl 6, psalm lvl 3. ts keeps proj cfg. type analysis remains proj-wide, even with file paths. no dep audits or dedicated security scans.
 
+biome skips `style/useConst` globally; other rules and proj cfg stay unchanged.
+
 ## cli
 
 ```sh

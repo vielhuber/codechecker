@@ -118,7 +118,13 @@ final class runner
                         'PSR12')
                 ],
                 tool::Eslint => ['--format=json', '--max-warnings=0'],
-                tool::Biome => ['check', '--reporter=json', '--max-diagnostics=none', '--error-on-warnings'],
+                tool::Biome => [
+                    'check',
+                    '--skip=style/useConst',
+                    '--reporter=json',
+                    '--max-diagnostics=none',
+                    '--error-on-warnings'
+                ],
                 tool::Prettier => ['--check'],
                 tool::TypeScript => ['--pretty', 'false'],
                 tool::Oxlint => ['--format=json', '--deny-warnings', '--threads=2']
