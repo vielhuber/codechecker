@@ -4,13 +4,14 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "format:check": "prettier --check src config .github README.md composer.json package.json tools/composer.json biome.json .prettierrc",
-        "format": "prettier --write src config .github README.md composer.json package.json tools/composer.json biome.json .prettierrc"
+        "format:check": "prettier --check src config .github README.md composer.json package.json tools/composer.json biome.json .prettierrc tsconfig.json",
+        "format": "prettier --write src config .github README.md composer.json package.json tools/composer.json biome.json .prettierrc tsconfig.json"
     },
     "devDependencies": {
         "@biomejs/biome": "2.6.3",
         "@eslint/js": "10.0.1",
         "@prettier/plugin-php": "0.26.0",
+        "@types/node": "24.19.2",
         "eslint": "10.13.0",
         "globals": "17.13.0",
         "oxlint": "1.89.0",

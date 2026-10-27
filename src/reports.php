@@ -80,7 +80,7 @@ final readonly class reports
                     foreach (
                         glob(
                             $folder .
-                                '/{composer.*,package*.json,npm-shrinkwrap.json,pnpm-lock.yaml,yarn.lock,bun.lock,eslint.config.*,.eslintrc*,biome.json*,.prettierrc*,prettier.config.*,mago.toml,rector.php*,.php-cs-fixer*.php,*phpcs*.xml*,phpstan.*,psalm.xml*,tsconfig.json,jsconfig.json}',
+                                '/{composer.*,package*.json,npm-shrinkwrap.json,pnpm-lock.yaml,yarn.lock,bun.lock,eslint.config.*,.eslintrc*,biome.json*,.prettierrc*,prettier.config.*,.editorconfig,mago.toml,rector.php*,.php-cs-fixer*.php,*phpcs*.xml*,phpstan.*,psalm.xml*,tsconfig.json,jsconfig.json}',
                             GLOB_BRACE
                         ) ?:
                         []
@@ -95,6 +95,23 @@ final readonly class reports
                     }
                     $folder = dirname($folder);
                 }
+            }
+            $folder = dirname($this->root);
+            while (true) {
+                foreach (
+                    glob($folder . '/{.prettierrc*,prettier.config.*,.editorconfig,package.json}', GLOB_BRACE) ?: []
+                    as $configuration
+                ) {
+                    if (!is_file($configuration)) {
+                        continue;
+                    }
+                    $configurations[$configuration] = hash_file('sha256', $configuration);
+                }
+                $parent = dirname($folder);
+                if ($parent === $folder) {
+                    break;
+                }
+                $folder = $parent;
             }
             foreach (glob(__DIR__ . '/../config/*') ?: [] as $configuration) {
                 if (is_file($configuration)) {

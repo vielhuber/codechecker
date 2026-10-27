@@ -46,6 +46,12 @@ final class exception extends \InvalidArgumentException
         return new self('Could not preserve the complete analyzer output.');
     }
 
+    /** Reject unresolved formatter settings rather than silently changing the project style. */
+    public static function formatterConfigurationFailed(string $reason): self
+    {
+        return new self('Could not resolve the project PHP formatter: ' . $reason);
+    }
+
     /** Reject broad checks before discovering or executing project sources. */
     public static function invalidFileMode(): self
     {
@@ -354,11 +360,33 @@ final readonly class codechecker
         if ($selected === []) {
             throw exception::emptySelection();
         }
+        $phpFiles = array_values(
+            array_filter(
+                $selected,
+                static fn(string $file): bool => in_array(
+                    strtolower(pathinfo($file, PATHINFO_EXTENSION)),
+                    workspace::PHP_EXTENSIONS,
+                    strict: true
+                )
+            )
+        );
+        $formatRequested =
+            in_array(tool::MagoFormat, $tools, strict: true) || in_array(tool::PhpCsFixer, $tools, strict: true);
+        $phpFormatter =
+            $phpFiles !== [] && ($formatRequested || in_array(tool::Prettier, $tools, strict: true))
+                ? $workspace->phpFormatter($phpFiles[0], $timeout)
+                : tool::PhpCsFixer;
+        if ($phpFiles !== [] && $formatRequested) {
+            $tools[] = $phpFormatter;
+        }
         $projectFiles = [];
         $runner = new runner();
         $results = [];
         foreach (array_unique($tools, SORT_REGULAR) as $tool) {
             $extensions = $tool->language() === 'php' ? workspace::PHP_EXTENSIONS : workspace::JAVASCRIPT_EXTENSIONS;
+            if ($tool === tool::Prettier && $phpFormatter === tool::Prettier) {
+                $extensions = [...$extensions, ...workspace::PHP_EXTENSIONS];
+            }
             $trigger = array_filter(
                 $selected,
                 static fn(string $file): bool => in_array(

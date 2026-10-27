@@ -20,6 +20,18 @@ final class runner
     public function run(tool $tool, workspace $workspace, array $files, int $timeout): result
     {
         $scope = $tool->projectWide() ? 'project' : 'files';
+        if (in_array($tool, [tool::MagoFormat, tool::PhpCsFixer], strict: true)) {
+            $formatter = $workspace->phpFormatter($files[0], $timeout);
+            if ($formatter !== $tool) {
+                return new result(
+                    tool: $tool,
+                    status: status::NotApplicable,
+                    scope: $scope,
+                    files: $files,
+                    output: 'PHP formatting is checked by ' . $formatter->value . '.'
+                );
+            }
+        }
         $binary = $this->locate($tool, $workspace);
         if ($binary === null) {
             return new result(
@@ -114,8 +126,8 @@ final class runner
                     '--report=json',
                     '--extensions=php,phtml,inc',
                     '--standard=' .
-                    ($workspace->configuration('phpcs.xml', '.phpcs.xml', 'phpcs.xml.dist', '.phpcs.xml.dist') ??
-                        'PSR12')
+                    ($workspace->configuration('.phpcs.xml', 'phpcs.xml', '.phpcs.xml.dist', 'phpcs.xml.dist') ??
+                        $configurationDirectory . '/phpcs.xml')
                 ],
                 tool::Eslint => ['--format=json', '--max-warnings=0'],
                 tool::Biome => [

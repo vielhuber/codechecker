@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace vielhuber\codechecker;
 
+use Symfony\Component\Process\Process;
+
 final readonly class workspace
 {
     public const PHP_EXTENSIONS = ['php', 'phtml', 'inc'];
@@ -109,5 +111,49 @@ final readonly class workspace
             }
         }
         return null;
+    }
+
+    /** Keep one formatting authority without requiring Node for PHP-only projects. */
+    public function phpFormatter(string $file, int $timeout): tool
+    {
+        if ($this->configuration('.php-cs-fixer.php', '.php-cs-fixer.dist.php') !== null) {
+            return tool::PhpCsFixer;
+        }
+        $mago = $this->configuration('mago.toml');
+        if ($mago !== null && preg_match('/^\s*\[formatter(?:\.|\])/m', (string) file_get_contents($mago)) === 1) {
+            return tool::MagoFormat;
+        }
+        $directory = $this->root;
+        do {
+            $packageHasPrettier =
+                is_file($directory . '/package.json') &&
+                isset(
+                    json_decode((string) file_get_contents($directory . '/package.json'), associative: true)['prettier']
+                );
+            if (
+                (glob($directory . '/{.prettierrc*,prettier.config.*}', GLOB_BRACE) ?: []) !== [] ||
+                $packageHasPrettier
+            ) {
+                $binary = new runner()->locate(tool::Prettier, $this);
+                if ($binary === null) {
+                    throw exception::formatterConfigurationFailed('Prettier is not installed.');
+                }
+                $process = new Process(
+                    ['node', __DIR__ . '/php-formatter.mjs', $binary, $file],
+                    $this->root,
+                    timeout: $timeout
+                );
+                if ($process->run() !== 0) {
+                    throw exception::formatterConfigurationFailed(trim($process->getErrorOutput()));
+                }
+                return trim($process->getOutput()) === 'php' ? tool::Prettier : tool::PhpCsFixer;
+            }
+            $parent = dirname($directory);
+            if ($parent === $directory) {
+                break;
+            }
+            $directory = $parent;
+        } while (true);
+        return tool::PhpCsFixer;
     }
 }

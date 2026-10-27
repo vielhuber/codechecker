@@ -31,7 +31,7 @@ once centrally, not per proj. skip npm for php-only. lib: `composer require viel
 | php   | `php-syntax`, `mago-format`, `mago-lint`, `mago-analyze`, `rector`, `php-cs-fixer`, `psalm`, `phpstan`, `phpcs` |
 | js/ts | `eslint`, `biome`, `prettier`, `typescript`, `oxlint`                                                           |
 
-proj bins/cfg first, central bins/defaults next, system bins last. defaults: psr-12, phpstan lvl 6, psalm lvl 3. ts keeps proj cfg. type analysis remains proj-wide, even with file paths. no dep audits or dedicated security scans.
+proj bins/cfg first, central bins/defaults next, system bins last. defaults: php-cs-fixer psr-12, phpcs psr-1 without the bootstrap side-effect ban, phpstan lvl 6, psalm lvl 3. ts keeps proj cfg. type analysis remains proj-wide, even with file paths. no dep audits or dedicated security scans.
 
 biome skips `style/useConst` and `complexity/noStaticOnlyClass` globally; other rules and proj cfg stay unchanged.
 js/ts formatting belongs to prettier; biome keeps lint and import checks, without its formatter.
@@ -39,6 +39,12 @@ js/ts formatting belongs to prettier; biome keeps lint and import checks, withou
 mago lint defaults skip blanket `isset`/elvis/ini/boolean-flag bans, file-name policy and aggregate class/size metrics.
 correctness/security rules and excessive nesting stay enabled; architecture metrics are opt-in.
 proj `mago.toml` settings override these defaults; explicit rule opt-ins remain possible.
+
+php formatting has one owner: explicit php-cs-fixer cfg, explicit mago `[formatter]`, prettier with a php parser, then central php-cs-fixer.
+project prettier cfg/plugins are resolved by prettier itself, including parent cfg. node is only needed for node-based checks/formatter detection.
+requesting a php format check also selects its owner. other formatters return `not_applicable` with a delegation reason, not a fabricated pass.
+prettier accepts php paths when it owns php formatting; its existing `javascript` language label denotes the node-based tool.
+central phpcs checks basic conventions, not competing whitespace profiles; explicit proj rulesets stay unchanged.
 
 ## cli
 
