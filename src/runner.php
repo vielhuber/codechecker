@@ -121,6 +121,7 @@ final class runner
                 tool::Biome => [
                     'check',
                     '--skip=style/useConst',
+                    '--skip=complexity/noStaticOnlyClass',
                     '--formatter-enabled=false',
                     '--reporter=json',
                     '--max-diagnostics=none',
@@ -130,6 +131,22 @@ final class runner
                 tool::TypeScript => ['--pretty', 'false'],
                 tool::Oxlint => ['--format=json', '--deny-warnings', '--threads=2']
             };
+            if ($tool === tool::MagoLint) {
+                $configurations = [$configurationDirectory . '/mago-lint.toml'];
+                $existing = $workspace->configuration('mago.toml');
+                if ($existing !== null) {
+                    $configurations[] = $existing;
+                }
+                file_put_contents(
+                    $cache . '/mago-lint.toml',
+                    'extends = ' . json_encode($configurations, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES) . "\n"
+                );
+                $arguments = [
+                    '--workspace=' . $workspace->root,
+                    '--config=' . $cache . '/mago-lint.toml',
+                    ...$arguments
+                ];
+            }
             $targets = $files;
             if ($tool === tool::MagoAnalyze) {
                 $existing = $workspace->configuration('mago.toml');

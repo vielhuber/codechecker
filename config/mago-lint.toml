@@ -1,0 +1,10 @@
+[linter.rules]
+no-isset = { enabled = false }
+no-shorthand-ternary = { enabled = false }
+halstead = { enabled = false }
+kan-defect = { enabled = false }
+cyclomatic-complexity = { enabled = false }
+too-many-methods = { enabled = false }
+no-ini-set = { enabled = false }
+no-boolean-flag-parameter = { enabled = false }
+file-name = { enabled = false }

@@ -33,8 +33,12 @@ once centrally, not per proj. skip npm for php-only. lib: `composer require viel
 
 proj bins/cfg first, central bins/defaults next, system bins last. defaults: psr-12, phpstan lvl 6, psalm lvl 3. ts keeps proj cfg. type analysis remains proj-wide, even with file paths. no dep audits or dedicated security scans.
 
-biome skips `style/useConst` globally; other rules and proj cfg stay unchanged.
+biome skips `style/useConst` and `complexity/noStaticOnlyClass` globally; other rules and proj cfg stay unchanged.
 js/ts formatting belongs to prettier; biome keeps lint and import checks, without its formatter.
+
+mago lint defaults skip blanket `isset`/elvis/ini/boolean-flag bans, file-name policy and aggregate class/size metrics.
+correctness/security rules and excessive nesting stay enabled; architecture metrics are opt-in.
+proj `mago.toml` settings override these defaults; explicit rule opt-ins remain possible.
 
 ## cli
 
