@@ -339,13 +339,12 @@ final class runner
                     : (in_array($exitCode, $findingCodes, true)
                         ? status::Findings
                         : status::Error);
+            $vnuMessages = $diagnostics['messages'] ?? null;
             if (
                 $tool === tool::Vnu &&
-                ($diagnostics === null ||
-                    !isset($diagnostics['messages']) ||
-                    !is_array($diagnostics['messages']) ||
+                (!is_array($vnuMessages) ||
                     array_any(
-                        $diagnostics['messages'],
+                        $vnuMessages,
                         static fn(mixed $message): bool => !is_array($message) ||
                             ($message['type'] ?? '') === 'non-document-error'
                     ))
