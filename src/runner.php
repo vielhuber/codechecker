@@ -339,7 +339,7 @@ final class runner
                     : (in_array($exitCode, $findingCodes, true)
                         ? status::Findings
                         : status::Error);
-            $vnuMessages = $diagnostics['messages'] ?? null;
+            $vnuMessages = $this->diagnosticObject($diagnostics['messages'] ?? null);
             if (
                 $tool === tool::Vnu &&
                 (!is_array($vnuMessages) ||
