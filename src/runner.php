@@ -341,7 +341,9 @@ final class runner
                         : status::Error);
             if (
                 $tool === tool::Vnu &&
-                (!is_array($diagnostics['messages'] ?? null) ||
+                ($diagnostics === null ||
+                    !isset($diagnostics['messages']) ||
+                    !is_array($diagnostics['messages']) ||
                     array_any(
                         $diagnostics['messages'],
                         static fn(mixed $message): bool => !is_array($message) ||
@@ -468,15 +470,21 @@ final class runner
             return PHP_BINARY;
         }
         if ($tool === tool::Vnu) {
-            return new \Symfony\Component\Process\ExecutableFinder()->find('java') === null
-                ? null
-                : array_find(
-                    [
-                        $workspace->root . '/node_modules/vnu-jar/build/dist/vnu.jar',
-                        __DIR__ . '/../node_modules/vnu-jar/build/dist/vnu.jar'
-                    ],
-                    static fn(string $path): bool => is_file($path) && is_readable($path)
-                );
+            if (new \Symfony\Component\Process\ExecutableFinder()->find('java') === null) {
+                return null;
+            }
+            foreach (
+                [
+                    $workspace->root . '/node_modules/vnu-jar/build/dist/vnu.jar',
+                    __DIR__ . '/../node_modules/vnu-jar/build/dist/vnu.jar'
+                ]
+                as $path
+            ) {
+                if (is_file($path) && is_readable($path)) {
+                    return $path;
+                }
+            }
+            return null;
         }
         $candidates = [
             $workspace->root . '/vendor/bin/' . $tool->executable(),
