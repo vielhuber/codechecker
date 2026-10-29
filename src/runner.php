@@ -39,7 +39,9 @@ final class runner
                 status: status::Unavailable,
                 scope: $scope,
                 files: $files,
-                errorOutput: 'Executable not found: ' . $tool->executable()
+                errorOutput: $tool === tool::Vnu
+                    ? 'vnu requires Java 17+ and an installed vnu-jar package.'
+                    : 'Executable not found: ' . $tool->executable()
             );
         }
         $cachePrefix = sys_get_temp_dir() . '/codechecker-' . substr(hash('sha256', $workspace->root), 0, 16) . '-';
@@ -92,6 +94,7 @@ final class runner
             $configurationDirectory = __DIR__ . '/../config';
             $arguments = match ($tool) {
                 tool::PhpSyntax => ['-l'],
+                tool::Vnu => ['-jar', $binary, '--format', 'json', '--stdout', '--Werror'],
                 tool::MagoFormat => ['--threads=2', 'format', '--check'],
                 tool::MagoLint => ['--threads=2', 'lint', '--reporting-format=json'],
                 tool::MagoAnalyze => ['--threads=2', 'analyze', '--reporting-format=json'],
@@ -276,7 +279,7 @@ final class runner
             ) {
                 $arguments[] = '--config=' . $configurationDirectory . '/eslint.config.mjs';
             }
-            $command = [$binary, ...$arguments, ...$targets];
+            $command = [$tool === tool::Vnu ? 'java' : $binary, ...$arguments, ...$targets];
             $process = new Process(
                 $command,
                 $workspace->root,
@@ -314,7 +317,7 @@ final class runner
             if (
                 in_array(
                     $tool,
-                    [tool::PhpStan, tool::PhpCodeSniffer, tool::Biome, tool::MagoLint, tool::MagoAnalyze],
+                    [tool::PhpStan, tool::PhpCodeSniffer, tool::Biome, tool::MagoLint, tool::MagoAnalyze, tool::Vnu],
                     true
                 )
             ) {
@@ -336,6 +339,18 @@ final class runner
                     : (in_array($exitCode, $findingCodes, true)
                         ? status::Findings
                         : status::Error);
+            if (
+                $tool === tool::Vnu &&
+                (!is_array($diagnostics['messages'] ?? null) ||
+                    array_any(
+                        $diagnostics['messages'],
+                        static fn(mixed $message): bool => !is_array($message) ||
+                            ($message['type'] ?? '') === 'non-document-error'
+                    ))
+            ) {
+                $status = status::Error;
+                $errorOutput .= 'Invalid vnu JSON output or a non-document error; see the complete report.';
+            }
             if (
                 $tool === tool::PhpStan &&
                 $exitCode !== 0 &&
@@ -451,6 +466,17 @@ final class runner
     {
         if ($tool === tool::PhpSyntax) {
             return PHP_BINARY;
+        }
+        if ($tool === tool::Vnu) {
+            return new \Symfony\Component\Process\ExecutableFinder()->find('java') === null
+                ? null
+                : array_find(
+                    [
+                        $workspace->root . '/node_modules/vnu-jar/build/dist/vnu.jar',
+                        __DIR__ . '/../node_modules/vnu-jar/build/dist/vnu.jar'
+                    ],
+                    static fn(string $path): bool => is_file($path) && is_readable($path)
+                );
         }
         $candidates = [
             $workspace->root . '/vendor/bin/' . $tool->executable(),

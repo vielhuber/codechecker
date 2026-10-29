@@ -1,6 +1,6 @@
 {
     "name": "vielhuber/codechecker",
-    "description": "Read-only PHP and JavaScript code checks through a PHP API, CLI and MCP server.",
+    "description": "Read-only PHP, HTML and JavaScript code checks through a PHP API, CLI and MCP server.",
     "license": "MIT",
     "require": {
         "php": "^8.5",

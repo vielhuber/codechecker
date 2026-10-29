@@ -7,11 +7,11 @@
 
 # ⌨️codechecker⌨️
 
-read-only php/js/ts checks via lib, cli & mcp. dirs, files or both.
+read-only php/html/js/ts checks via lib, cli & mcp. dirs, files or both.
 
 ## setup
 
-php ≥ 8.5 (`proc_open`); node ≥ 24 for js/ts.
+php ≥ 8.5 (`proc_open`); node ≥ 24 for js/ts; java ≥ 17 for html.
 
 ```sh
 git clone https://github.com/vielhuber/codechecker.git
@@ -24,12 +24,15 @@ npm install --no-audit --no-fund
 
 once centrally, not per proj. skip npm for php-only. lib: `composer require vielhuber/codechecker` via [packagist](https://packagist.org/packages/vielhuber/codechecker); tools installed separately. target deps/plugins required.
 
+html uses the jar from `vnu-jar`, installed by npm; checks invoke java directly, never the auto-downloading npm wrapper. install java before checking. no node process is needed for html-only runs.
+
 ## tools
 
 | lang  | checks                                                                                                          |
 | ----- | --------------------------------------------------------------------------------------------------------------- |
 | php   | `php-syntax`, `mago-format`, `mago-lint`, `mago-analyze`, `rector`, `php-cs-fixer`, `psalm`, `phpstan`, `phpcs` |
 | js/ts | `eslint`, `biome`, `prettier`, `typescript`, `oxlint`                                                           |
+| html  | `vnu`                                                                                                           |
 
 proj bins/cfg first, central bins/defaults next, system bins last. defaults: php-cs-fixer psr-12, phpcs psr-1 without the bootstrap side-effect ban, phpstan lvl 6, psalm lvl 3. ts keeps proj cfg. type analysis remains proj-wide, even with file paths. no dep audits or dedicated security scans.
 
@@ -46,12 +49,15 @@ requesting a php format check also selects its owner. other formatters return `n
 prettier accepts php paths when it owns php formatting; its existing `javascript` language label denotes the node-based tool.
 central phpcs checks basic conventions, not competing whitespace profiles; explicit proj rulesets stay unchanged.
 
+html: [nu html checker](https://validator.github.io/validator/) checks complete `.html`/`.htm` docs offline, without fixes. errors/warnings fail; info stays in the raw report. invalid checker output or non-document errors are incomplete checks. template source is not rendered; supply the generated html instead.
+
 ## cli
 
 ```sh
 php src/codechecker-cli.php --root=/var/www/proj .
 php src/codechecker-cli.php --root=/var/www/proj --tools=php-syntax,eslint src/demo.php public/demo.js
 php src/codechecker-cli.php --root=/var/www/proj --mode=files --tools=php-syntax --summary src/demo.php
+php src/codechecker-cli.php --root=/var/www/proj --mode=files --tools=vnu --summary public/index.html
 php src/codechecker-cli.php --root=/var/www/proj --report=REPORT_ID
 php src/codechecker-cli.php --root=/var/www/proj --list-tools
 ```
@@ -100,6 +106,7 @@ summary: tool status, `reportId`, up to 20 new/unknown findings, counts for `new
 
 - `list_tools(project: "shop")`: bins/checks.
 - `check_code(project: "shop", paths: ["src/demo.php"], tools: ["php-syntax"])`: run + compact summary.
+- `check_code(project: "shop", paths: ["public/index.html"], tools: ["vnu"])`: html only; no php/js checks.
 - `check_code(project: "shop", mode: "project", tools: ["phpstan"])`: explicitly requested proj analysis.
 - `get_report(project: "shop", reportId: "REPORT_ID", tool: "phpcs")`: full report, optionally filtered by tool.
 

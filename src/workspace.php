@@ -8,6 +8,7 @@ use Symfony\Component\Process\Process;
 final readonly class workspace
 {
     public const PHP_EXTENSIONS = ['php', 'phtml', 'inc'];
+    public const HTML_EXTENSIONS = ['html', 'htm'];
     public const JAVASCRIPT_EXTENSIONS = ['js', 'mjs', 'cjs', 'jsx', 'ts', 'mts', 'cts', 'tsx'];
     private const EXCLUDED_DIRECTORIES = [
         '.git',
@@ -61,7 +62,7 @@ final readonly class workspace
                     !is_readable($resolved) ||
                     !in_array(
                         strtolower(pathinfo($resolved, PATHINFO_EXTENSION)),
-                        [...self::PHP_EXTENSIONS, ...self::JAVASCRIPT_EXTENSIONS],
+                        [...self::PHP_EXTENSIONS, ...self::HTML_EXTENSIONS, ...self::JAVASCRIPT_EXTENSIONS],
                         true
                     )
                 ) {
@@ -84,7 +85,7 @@ final readonly class workspace
                     !$file->isFile() ||
                     !in_array(
                         strtolower($file->getExtension()),
-                        [...self::PHP_EXTENSIONS, ...self::JAVASCRIPT_EXTENSIONS],
+                        [...self::PHP_EXTENSIONS, ...self::HTML_EXTENSIONS, ...self::JAVASCRIPT_EXTENSIONS],
                         true
                     )
                 ) {

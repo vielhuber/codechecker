@@ -147,7 +147,7 @@ final readonly class reports
                     }
                     $result['outputTruncated'] = false;
                 }
-                $binary = $result['command'][0] ?? null;
+                $binary = $result['tool'] === 'vnu' ? $result['command'][2] ?? null : $result['command'][0] ?? null;
                 if (
                     $binary !== null &&
                     tool::from($result['tool'])->language() === 'javascript' &&
@@ -163,7 +163,9 @@ final readonly class reports
                 }
                 if ($binary !== null && !array_key_exists($binary, $versions)) {
                     $version = new Process(
-                        [$binary, '--version'],
+                        $result['tool'] === 'vnu'
+                            ? [...array_slice($result['command'], offset: 0, length: 3), '--version']
+                            : [$binary, '--version'],
                         env: ['NO_COLOR' => '1', 'FORCE_COLOR' => false],
                         timeout: 5
                     );
@@ -186,6 +188,24 @@ final readonly class reports
                 /** @var array<string, mixed>|list<array<string, mixed>>|null $decoded */
                 $decoded = json_decode($result['output'], true);
                 $diagnostics = [];
+                if ($result['tool'] === 'vnu' && is_array($decoded)) {
+                    /** @var array{url?: string, messages: list<array{type: string, subType?: string, url?: string, lastLine?: int, lastColumn?: int, message: string}>} $vnu */
+                    $vnu = $decoded;
+                    foreach ($vnu['messages'] as $message) {
+                        if ($message['type'] !== 'error' && ($message['subType'] ?? '') !== 'warning') {
+                            continue;
+                        }
+                        $diagnostics[] = [
+                            'file' => rawurldecode(
+                                parse_url($message['url'] ?? ($vnu['url'] ?? ''), PHP_URL_PATH) ?: ''
+                            ),
+                            'line' => $message['lastLine'] ?? 0,
+                            'column' => $message['lastColumn'] ?? 0,
+                            'message' => $message['message'],
+                            'severity' => $message['type'] === 'error' ? 'error' : 'warning'
+                        ];
+                    }
+                }
                 if ($result['tool'] === 'eslint' && is_array($decoded) && array_is_list($decoded)) {
                     /** @var list<array{filePath: string, messages?: list<array<string, mixed>>}> $eslintFiles */
                     $eslintFiles = $decoded;
@@ -227,7 +247,7 @@ final readonly class reports
                     ];
                 }
                 foreach ($diagnostics as $nativeDiagnostic) {
-                    /** @var array{annotations?: list<array{span?: array{file_id?: array{path?: string}, start?: array{line?: int}}}>, file?: string, file_path?: string, filename?: string, location?: array{path?: string, start?: array{line?: int}}, line?: int, line_from?: int, labels?: list<array{span?: array{line?: int}}>, ruleId?: ?string, source?: string, identifier?: string, code?: string, category?: string, type?: string, message?: null|bool|int|float|string|array<array-key, mixed>, level?: string, severity?: int|string, digest?: string} $diagnostic */
+                    /** @var array{annotations?: list<array{span?: array{file_id?: array{path?: string}, start?: array{line?: int}}}>, file?: string, file_path?: string, filename?: string, location?: array{path?: string, start?: array{line?: int}}, line?: int, column?: int, line_from?: int, labels?: list<array{span?: array{line?: int}}>, ruleId?: ?string, source?: string, identifier?: string, code?: string, category?: string, type?: string, message?: null|bool|int|float|string|array<array-key, mixed>, level?: string, severity?: int|string, digest?: string} $diagnostic */
                     $diagnostic = $nativeDiagnostic;
                     $annotation = $diagnostic['annotations'][0]['span'] ?? [];
                     $file =
@@ -301,6 +321,7 @@ final readonly class reports
                         'rule' => $rule,
                         'file' => $file,
                         'line' => $line,
+                        'column' => $diagnostic['column'] ?? 0,
                         'message' => $message,
                         'severity' => $severity,
                         'precise' => $precise,

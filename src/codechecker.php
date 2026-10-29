@@ -29,7 +29,7 @@ final class exception extends \InvalidArgumentException
     /** Prevent accidentally succeeding with an empty inspection. */
     public static function emptySelection(): self
     {
-        return new self('No supported PHP or JavaScript/TypeScript source files were selected.');
+        return new self('No supported PHP, HTML or JavaScript/TypeScript source files were selected.');
     }
 
     /** Reject invalid execution settings before starting subprocesses. */
@@ -88,6 +88,7 @@ enum tool: string
     case Psalm = 'psalm';
     case PhpStan = 'phpstan';
     case PhpCodeSniffer = 'phpcs';
+    case Vnu = 'vnu';
     case Eslint = 'eslint';
     case Biome = 'biome';
     case Prettier = 'prettier';
@@ -103,6 +104,9 @@ enum tool: string
     /** Select the language without depending on an installed executable. */
     public function language(): string
     {
+        if ($this === self::Vnu) {
+            return 'html';
+        }
         return in_array($this, [self::Eslint, self::Biome, self::Prettier, self::TypeScript, self::Oxlint], true)
             ? 'javascript'
             : 'php';
@@ -278,7 +282,7 @@ final readonly class codechecker
      */
     #[McpTool(
         name: 'check_code',
-        description: 'Read-only checks with persistent full reports and compact findings. File mode requires explicit files and file-scoped tools. Only explicitly requested project mode permits directories, empty selections or project-wide analysis. No fixes or installations.'
+        description: 'Read-only PHP/HTML/JS/TS checks with persistent full reports and compact findings. Select tools ["vnu"] for HTML only. File mode requires explicit files and file-scoped tools. Only explicitly requested project mode permits directories, empty selections or project-wide analysis. No fixes or installations.'
     )]
     public function checkCode(
         #[Schema(type: 'array', items: ['type' => 'string', 'minLength' => 1])] array $paths = [],
@@ -296,6 +300,7 @@ final readonly class codechecker
                     'psalm',
                     'phpstan',
                     'phpcs',
+                    'vnu',
                     'eslint',
                     'biome',
                     'prettier',
@@ -383,7 +388,11 @@ final readonly class codechecker
         $runner = new runner();
         $results = [];
         foreach (array_unique($tools, SORT_REGULAR) as $tool) {
-            $extensions = $tool->language() === 'php' ? workspace::PHP_EXTENSIONS : workspace::JAVASCRIPT_EXTENSIONS;
+            $extensions = match ($tool->language()) {
+                'php' => workspace::PHP_EXTENSIONS,
+                'html' => workspace::HTML_EXTENSIONS,
+                default => workspace::JAVASCRIPT_EXTENSIONS
+            };
             if ($tool === tool::Prettier && $phpFormatter === tool::Prettier) {
                 $extensions = [...$extensions, ...workspace::PHP_EXTENSIONS];
             }
