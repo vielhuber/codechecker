@@ -3,5 +3,7 @@
     <description>basic php conventions; formatting belongs to the project formatter.</description>
     <rule ref="PSR1">
         <exclude name="PSR1.Files.SideEffects"/>
+        <exclude name="Squiz.Classes.ValidClassName"/>
+        <exclude name="PSR1.Classes.ClassDeclaration.MultipleClasses"/>
     </rule>
 </ruleset>

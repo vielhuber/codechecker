@@ -40,7 +40,7 @@ final readonly class workspace
         $resolved = realpath(str_starts_with($path, DIRECTORY_SEPARATOR) ? $path : $this->root . '/' . $path);
         if (
             $resolved === false ||
-            ($resolved !== $this->root && !str_starts_with($resolved, rtrim($this->root, '/') . '/'))
+            ($resolved !== $this->root && !str_starts_with($resolved, rtrim($this->root, characters: '/') . '/'))
         ) {
             throw exception::invalidPath($path);
         }
@@ -63,7 +63,7 @@ final readonly class workspace
                     !in_array(
                         strtolower(pathinfo($resolved, PATHINFO_EXTENSION)),
                         [...self::PHP_EXTENSIONS, ...self::HTML_EXTENSIONS, ...self::JAVASCRIPT_EXTENSIONS],
-                        true
+                        strict: true
                     )
                 ) {
                     throw exception::unsupportedFile($path);
@@ -76,7 +76,7 @@ final readonly class workspace
                     new \RecursiveDirectoryIterator($resolved, \FilesystemIterator::SKIP_DOTS),
                     static fn(mixed $file): bool => $file instanceof \SplFileInfo &&
                         !$file->isLink() &&
-                        (!$file->isDir() || !in_array($file->getFilename(), self::EXCLUDED_DIRECTORIES, true))
+                        (!$file->isDir() || !in_array($file->getFilename(), self::EXCLUDED_DIRECTORIES, strict: true))
                 )
             );
             foreach ($iterator as $file) {
@@ -86,7 +86,7 @@ final readonly class workspace
                     !in_array(
                         strtolower($file->getExtension()),
                         [...self::PHP_EXTENSIONS, ...self::HTML_EXTENSIONS, ...self::JAVASCRIPT_EXTENSIONS],
-                        true
+                        strict: true
                     )
                 ) {
                     continue;

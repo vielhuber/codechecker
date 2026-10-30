@@ -9,7 +9,7 @@ use Symfony\Component\Process\Process;
 
 final class runner
 {
-    private const OUTPUT_LIMIT = 1048576;
+    private const OUTPUT_LIMIT = 1_048_576;
     private const OUTPUT_RETENTION = 86_400;
 
     /**
@@ -44,7 +44,11 @@ final class runner
                     : 'Executable not found: ' . $tool->executable()
             );
         }
-        $cachePrefix = sys_get_temp_dir() . '/codechecker-' . substr(hash('sha256', $workspace->root), 0, 16) . '-';
+        $cachePrefix =
+            sys_get_temp_dir() .
+            '/codechecker-' .
+            substr(hash('sha256', $workspace->root), offset: 0, length: 16) .
+            '-';
         foreach (glob($cachePrefix . '*/stdout.log') ?: [] as $previousOutput) {
             $directory = dirname($previousOutput);
             $modified = filemtime($previousOutput);
@@ -59,7 +63,7 @@ final class runner
             }
         }
         $cache = $cachePrefix . bin2hex(random_bytes(12));
-        if (!mkdir($cache, 0700)) {
+        if (!mkdir($cache, permissions: 0o700)) {
             return new result(
                 tool: $tool,
                 status: status::Error,
@@ -81,13 +85,13 @@ final class runner
         $errorOutputFile = null;
         $process = null;
         try {
-            $outputStream = fopen($cache . '/stdout.log', 'x+b');
-            $errorStream = fopen($cache . '/stderr.log', 'x+b');
+            $outputStream = fopen($cache . '/stdout.log', mode: 'x+b');
+            $errorStream = fopen($cache . '/stderr.log', mode: 'x+b');
             if (
                 $outputStream === false ||
                 $errorStream === false ||
-                !chmod($cache . '/stdout.log', 0600) ||
-                !chmod($cache . '/stderr.log', 0600)
+                !chmod($cache . '/stdout.log', permissions: 0o600) ||
+                !chmod($cache . '/stderr.log', permissions: 0o600)
             ) {
                 throw exception::outputStorageFailed();
             }
@@ -199,7 +203,10 @@ final class runner
                 if ($existing === null) {
                     $configuration['parameters']['level'] = 6;
                 }
-                file_put_contents($cache . '/phpstan.php', '<?php return ' . var_export($configuration, true) . ';');
+                file_put_contents(
+                    $cache . '/phpstan.php',
+                    '<?php return ' . var_export($configuration, return: true) . ';'
+                );
                 $arguments[] = '--configuration=' . $cache . '/phpstan.php';
                 $targets = [];
             }
@@ -301,7 +308,7 @@ final class runner
                 $buffer = $type === Process::ERR ? $errorOutput : $output;
                 $available = max(0, self::OUTPUT_LIMIT - strlen($buffer));
                 $truncated = $truncated || strlen($chunk) > $available;
-                $buffer .= substr($chunk, 0, $available);
+                $buffer .= substr($chunk, offset: 0, length: $available);
                 if ($type === Process::ERR) {
                     $errorOutput = $buffer;
                 }
@@ -318,11 +325,11 @@ final class runner
                 in_array(
                     $tool,
                     [tool::PhpStan, tool::PhpCodeSniffer, tool::Biome, tool::MagoLint, tool::MagoAnalyze, tool::Vnu],
-                    true
+                    strict: true
                 )
             ) {
                 $diagnostics = $this->diagnosticObject(
-                    json_decode((string) file_get_contents($cache . '/stdout.log'), true)
+                    json_decode((string) file_get_contents($cache . '/stdout.log'), associative: true)
                 );
             }
             $findingCodes = match ($tool) {
@@ -333,12 +340,11 @@ final class runner
                 tool::TypeScript => [1, 2],
                 default => [1]
             };
-            $status =
-                $exitCode === 0
-                    ? status::Passed
-                    : (in_array($exitCode, $findingCodes, true)
-                        ? status::Findings
-                        : status::Error);
+            $status = match (true) {
+                $exitCode === 0 => status::Passed,
+                in_array($exitCode, $findingCodes, strict: true) => status::Findings,
+                default => status::Error
+            };
             $vnuMessages = $this->diagnosticObject($diagnostics['messages'] ?? null);
             if (
                 $tool === tool::Vnu &&
@@ -360,7 +366,7 @@ final class runner
                 $status = status::Error;
             }
             if (
-                in_array($tool, [tool::PhpCodeSniffer, tool::Biome], true) &&
+                in_array($tool, [tool::PhpCodeSniffer, tool::Biome], strict: true) &&
                 $exitCode !== 0 &&
                 $diagnostics === null
             ) {
@@ -374,7 +380,7 @@ final class runner
                 $status = status::Error;
             }
             if (
-                in_array($tool, [tool::MagoLint, tool::MagoAnalyze], true) &&
+                in_array($tool, [tool::MagoLint, tool::MagoAnalyze], strict: true) &&
                 $exitCode === 0 &&
                 $diagnostics !== null &&
                 ($diagnostics['issues'] ?? []) !== []
@@ -409,7 +415,7 @@ final class runner
             foreach ($iterator as $file) {
                 if (
                     $file instanceof \SplFileInfo &&
-                    !in_array($file->getPathname(), [$outputFile, $errorOutputFile], true)
+                    !in_array($file->getPathname(), [$outputFile, $errorOutputFile], strict: true)
                 ) {
                     $directory = $file->isDir() && !$file->isLink();
                     if ($directory) {
@@ -433,7 +439,7 @@ final class runner
             exitCode: $exitCode,
             output: $output,
             errorOutput: $errorOutput,
-            seconds: round(microtime(true) - $started, 3),
+            seconds: round(microtime(true) - $started, precision: 3),
             outputTruncated: $truncated,
             outputFile: $outputFile,
             errorOutputFile: $errorOutputFile
@@ -444,7 +450,7 @@ final class runner
     private function preview(string $text): string
     {
         for ($trim = 0; $trim < 4; ++$trim) {
-            $preview = $trim === 0 ? $text : substr($text, 0, -$trim);
+            $preview = $trim === 0 ? $text : substr($text, offset: 0, length: -$trim);
             if (preg_match('//u', $preview) === 1) {
                 return $preview;
             }

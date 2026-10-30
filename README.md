@@ -34,12 +34,12 @@ html uses the jar from `vnu-jar`, installed by npm; checks invoke java directly,
 | js/ts | `eslint`, `biome`, `prettier`, `typescript`, `oxlint`                                                           |
 | html  | `vnu`                                                                                                           |
 
-proj bins/cfg first, central bins/defaults next, system bins last. defaults: php-cs-fixer psr-12, phpcs psr-1 without the bootstrap side-effect ban, phpstan lvl 6, psalm lvl 3. ts keeps proj cfg. type analysis remains proj-wide, even with file paths. no dep audits or dedicated security scans.
+proj bins/cfg first, central bins/defaults next, system bins last. defaults: php-cs-fixer psr-12, phpcs psr-1 without the bootstrap side-effect ban, pascal-case requirement or single-class-per-file policy, phpstan lvl 6, psalm lvl 3. ts keeps proj cfg. type analysis remains proj-wide, even with file paths. no dep audits or dedicated security scans.
 
 biome skips `style/useConst` and `complexity/noStaticOnlyClass` globally; other rules and proj cfg stay unchanged.
 js/ts formatting belongs to prettier; biome keeps lint and import checks, without its formatter.
 
-mago lint defaults skip blanket `isset`/elvis/ini/boolean-flag bans, file-name policy and aggregate class/size metrics.
+mago lint defaults skip blanket `isset`/elvis/ini/boolean-flag bans, file/class/enum-name policies, single-class-per-file and aggregate class/size/parameter metrics. lowercase names and compact files remain valid. early-continue suggestions are off; unsafe control flow in `finally` stays checked.
 correctness/security rules and excessive nesting stay enabled; architecture metrics are opt-in.
 proj `mago.toml` settings override these defaults; explicit rule opt-ins remain possible.
 

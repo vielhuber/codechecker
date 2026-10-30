@@ -27,11 +27,11 @@ final readonly class reports
             }
             $base = $state . '/codechecker';
         }
-        if (!str_starts_with($base, '/') || realpath($base) === '/') {
+        if (!str_starts_with($base, needle: '/') || realpath($base) === '/') {
             throw exception::invalidRoot($base);
         }
-        $base = rtrim(realpath($base) ?: $base, '/');
-        $this->directory = rtrim($base, '/') . '/' . hash('sha256', $root);
+        $base = rtrim(realpath($base) ?: $base, characters: '/');
+        $this->directory = rtrim($base, characters: '/') . '/' . hash('sha256', $root);
     }
 
     /**
@@ -43,7 +43,9 @@ final readonly class reports
     {
         if (
             is_link($this->directory) ||
-            (!is_dir($this->directory) && !mkdir($this->directory, 0o700, true) && !is_dir($this->directory))
+            (!is_dir($this->directory) &&
+                !mkdir($this->directory, permissions: 0o700, recursive: true) &&
+                !is_dir($this->directory))
         ) {
             throw exception::outputStorageFailed();
         }
@@ -54,8 +56,8 @@ final readonly class reports
         if (is_link($this->directory . '/.lock')) {
             throw exception::outputStorageFailed();
         }
-        $lock = fopen($this->directory . '/.lock', 'c');
-        if ($lock === false || !chmod($this->directory . '/.lock', 0o600) || !flock($lock, LOCK_EX)) {
+        $lock = fopen($this->directory . '/.lock', mode: 'c');
+        if ($lock === false || !chmod($this->directory . '/.lock', permissions: 0o600) || !flock($lock, LOCK_EX)) {
             if (is_resource($lock)) {
                 fclose($lock);
             }
@@ -186,7 +188,7 @@ final readonly class reports
                     continue;
                 }
                 /** @var array<string, mixed>|list<array<string, mixed>>|null $decoded */
-                $decoded = json_decode($result['output'], true);
+                $decoded = json_decode($result['output'], associative: true);
                 $diagnostics = [];
                 if ($result['tool'] === 'vnu' && is_array($decoded)) {
                     /** @var array{url?: string, messages: list<array{type: string, subType?: string, url?: string, lastLine?: int, lastColumn?: int, message: string}>} $vnu */
@@ -215,7 +217,7 @@ final readonly class reports
                         }
                     }
                 }
-                if (in_array($result['tool'], ['phpcs', 'phpstan'], true) && is_array($decoded)) {
+                if (in_array($result['tool'], ['phpcs', 'phpstan'], strict: true) && is_array($decoded)) {
                     /** @var array<string, array{messages?: list<array<string, mixed>>}> $phpFiles */
                     $phpFiles = $decoded['files'] ?? [];
                     foreach ($phpFiles as $file => $details) {
@@ -225,7 +227,7 @@ final readonly class reports
                     }
                 }
                 if (
-                    in_array($result['tool'], ['mago-lint', 'mago-analyze', 'biome', 'oxlint'], true) &&
+                    in_array($result['tool'], ['mago-lint', 'mago-analyze', 'biome', 'oxlint'], strict: true) &&
                     is_array($decoded)
                 ) {
                     /** @var list<array<string, mixed>> $diagnostics */
@@ -352,7 +354,11 @@ final readonly class reports
             $previous = null;
             if ($comparable && is_file($latest)) {
                 /** @var string|null $previousReportId */
-                $previousReportId = json_decode((string) file_get_contents($latest), true, flags: JSON_THROW_ON_ERROR);
+                $previousReportId = json_decode(
+                    (string) file_get_contents($latest),
+                    associative: true,
+                    flags: JSON_THROW_ON_ERROR
+                );
                 if (!is_string($previousReportId)) {
                     throw exception::reportNotFound();
                 }
@@ -412,8 +418,8 @@ final readonly class reports
                         array_flip(['tool', 'status', 'scope', 'seconds', 'version', 'normalized'])
                     );
                     $summary['version'] = $result['version'] !== null ? explode("\n", $result['version'])[0] : null;
-                    if (in_array($result['status'], ['error', 'timeout', 'unavailable'], true)) {
-                        $summary['errorOutput'] = $this->preview($result['errorOutput'], 1000);
+                    if (in_array($result['status'], ['error', 'timeout', 'unavailable'], strict: true)) {
+                        $summary['errorOutput'] = $this->preview($result['errorOutput'], limit: 1000);
                         $summary['detailsTruncated'] = strlen($result['errorOutput']) > strlen($summary['errorOutput']);
                     }
                     return $summary;
@@ -426,9 +432,9 @@ final readonly class reports
                     'resolved' => count($resolved)
                 ],
                 'findings' => array_map(function (array $finding): array {
-                    $finding['message'] = $this->preview($finding['message'], 500);
+                    $finding['message'] = $this->preview($finding['message'], limit: 500);
                     return $finding;
-                }, array_slice($visible, 0, 20)),
+                }, array_slice($visible, offset: 0, length: 20)),
                 'omittedFindings' => max(0, count($visible) - 20)
             ];
             $data += [
@@ -471,7 +477,7 @@ final readonly class reports
             throw exception::reportNotFound();
         }
         /** @var array<string, mixed>|null $data */
-        $data = json_decode((string) file_get_contents($file), true, flags: JSON_THROW_ON_ERROR);
+        $data = json_decode((string) file_get_contents($file), associative: true, flags: JSON_THROW_ON_ERROR);
         if (!is_array($data) || ($data['root'] ?? null) !== $this->root || ($data['reportId'] ?? null) !== $reportId) {
             throw exception::reportNotFound();
         }
@@ -492,12 +498,16 @@ final readonly class reports
     private function write(string $file, string $content): void
     {
         $temporary = $file . '.' . bin2hex(random_bytes(8));
-        $handle = fopen($temporary, 'x');
+        $handle = fopen($temporary, mode: 'x');
         if ($handle === false) {
             throw exception::outputStorageFailed();
         }
         try {
-            if (!chmod($temporary, 0o600) || fwrite($handle, $content) !== strlen($content) || !fflush($handle)) {
+            if (
+                !chmod($temporary, permissions: 0o600) ||
+                fwrite($handle, $content) !== strlen($content) ||
+                !fflush($handle)
+            ) {
                 throw exception::outputStorageFailed();
             }
             if (!rename($temporary, $file)) {

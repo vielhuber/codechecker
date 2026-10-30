@@ -8,3 +8,8 @@ too-many-methods = { enabled = false }
 no-ini-set = { enabled = false }
 no-boolean-flag-parameter = { enabled = false }
 file-name = { enabled = false }
+class-name = { enabled = false }
+enum-name = { enabled = false }
+single-class-per-file = { enabled = false }
+excessive-parameter-list = { enabled = false }
+prefer-early-continue = { enabled = false }

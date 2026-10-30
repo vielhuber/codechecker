@@ -98,7 +98,7 @@ enum tool: string
     /** Distinguish file checks from analyzers that need the complete project graph. */
     public function projectWide(): bool
     {
-        return in_array($this, [self::MagoAnalyze, self::Psalm, self::PhpStan, self::TypeScript], true);
+        return in_array($this, [self::MagoAnalyze, self::Psalm, self::PhpStan, self::TypeScript], strict: true);
     }
 
     /** Select the language without depending on an installed executable. */
@@ -107,7 +107,11 @@ enum tool: string
         if ($this === self::Vnu) {
             return 'html';
         }
-        return in_array($this, [self::Eslint, self::Biome, self::Prettier, self::TypeScript, self::Oxlint], true)
+        return in_array(
+            $this,
+            [self::Eslint, self::Biome, self::Prettier, self::TypeScript, self::Oxlint],
+            strict: true
+        )
             ? 'javascript'
             : 'php';
     }
@@ -193,7 +197,7 @@ final readonly class report implements \JsonSerializable
                 static fn(result $result): bool => in_array(
                     $result->status,
                     [status::Passed, status::Findings, status::NotApplicable],
-                    true
+                    strict: true
                 )
             );
         $this->passed =
@@ -203,7 +207,7 @@ final readonly class report implements \JsonSerializable
                 static fn(result $result): bool => in_array(
                     $result->status,
                     [status::Passed, status::NotApplicable],
-                    true
+                    strict: true
                 )
             );
     }
@@ -262,7 +266,7 @@ final readonly class codechecker
         $workspace = new workspace($this->workspace->resolve($project));
         $runner = new runner();
         return array_map(
-            fn(tool $tool): array => [
+            static fn(tool $tool): array => [
                 'name' => $tool->value,
                 'language' => $tool->language(),
                 'scope' => $tool->projectWide() ? 'project' : 'files',
@@ -335,7 +339,7 @@ final readonly class codechecker
         if ($timeout < 1 || $timeout > 600) {
             throw exception::invalidOptions();
         }
-        if (!in_array($mode, ['files', 'project'], true)) {
+        if (!in_array($mode, ['files', 'project'], strict: true)) {
             throw exception::invalidOptions();
         }
         if ($mode === 'files' && ($paths === [] || $tools === [])) {
@@ -401,7 +405,7 @@ final readonly class codechecker
                 static fn(string $file): bool => in_array(
                     strtolower(pathinfo($file, PATHINFO_EXTENSION)),
                     $extensions,
-                    true
+                    strict: true
                 )
             );
             $scope = $tool->projectWide() ? 'project' : 'files';
@@ -418,7 +422,7 @@ final readonly class codechecker
                     static fn(string $file): bool => in_array(
                         strtolower(pathinfo($file, PATHINFO_EXTENSION)),
                         $extensions,
-                        true
+                        strict: true
                     )
                 )
             );
