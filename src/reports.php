@@ -469,9 +469,17 @@ final readonly class reports
      */
     public function read(string $reportId): array
     {
-        if (preg_match('/^[a-f0-9]{32}$/', $reportId) !== 1) {
+        if (preg_match('/\A[a-f0-9]{32}\z/', $reportId) !== 1) {
             throw exception::reportNotFound();
         }
+        /**
+         * The validated ID cannot escape the private local report directory.
+         *
+         * @psalm-taint-escape file
+         * @psalm-taint-escape ssrf
+         * @psalm-taint-escape url_component
+         * @psalm-taint-escape url_path
+         */
         $file = $this->directory . '/' . $reportId . '.json';
         if (is_link($this->directory) || is_link($file) || !is_file($file)) {
             throw exception::reportNotFound();

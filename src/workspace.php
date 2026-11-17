@@ -31,10 +31,25 @@ final readonly class workspace
         if ($resolved === false || !is_dir($resolved) || !is_readable($resolved)) {
             throw exception::invalidRoot($root);
         }
+        /**
+         * Only a canonical local directory becomes the workspace boundary.
+         *
+         * @psalm-taint-escape file
+         * @psalm-taint-escape ssrf
+         * @psalm-taint-escape url_component
+         * @psalm-taint-escape url_path
+         */
         $this->root = $resolved;
     }
 
-    /** Resolve both explicit inputs and discovered paths against the same boundary. */
+    /**
+     * Resolve both explicit inputs and discovered paths against the same boundary.
+     *
+     * @psalm-taint-escape file
+     * @psalm-taint-escape ssrf
+     * @psalm-taint-escape url_component
+     * @psalm-taint-escape url_path
+     */
     public function resolve(string $path): string
     {
         $resolved = realpath(str_starts_with($path, DIRECTORY_SEPARATOR) ? $path : $this->root . '/' . $path);

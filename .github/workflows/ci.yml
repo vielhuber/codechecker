@@ -53,3 +53,6 @@ jobs:
 
             - name: Syntax and static analysis
               run: php src/codechecker-cli.php --root=. --tools=php-syntax,mago-analyze,phpstan,psalm,eslint,biome,typescript,oxlint .
+
+            - name: Path boundary regressions
+              run: php tests/path-boundaries.php
