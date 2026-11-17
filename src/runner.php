@@ -415,7 +415,7 @@ final class runner
             foreach ($iterator as $file) {
                 if (
                     $file instanceof \SplFileInfo &&
-                    !in_array($file->getPathname(), [$outputFile, $errorOutputFile], strict: true)
+                    !in_array($file->getPathname(), array_filter([$outputFile, $errorOutputFile]), strict: true)
                 ) {
                     $directory = $file->isDir() && !$file->isLink();
                     if ($directory) {

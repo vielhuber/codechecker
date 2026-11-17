@@ -8,7 +8,7 @@
         "carthage-software/mago": "^1.57",
         "rector/rector": "^2.7",
         "friendsofphp/php-cs-fixer": "^3.95",
-        "vimeo/psalm": "^6.20",
+        "vimeo/psalm": "^7.9",
         "phpstan/phpstan": "^2.3",
         "squizlabs/php_codesniffer": "^4.0"
     },
